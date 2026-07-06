@@ -1,0 +1,36 @@
+# ── secrets / credentials ───────────────────────────────────────
+.env
+config.toml
+*token*.json
+garmin_tokens.json
+users_allow.json
+admins.json
+pro_users.json
+
+# ── runtime data (personal) ─────────────────────────────────────
+# training.db = live database; data/ = per-second HR series (biometrics)
+*.db
+*.db.bak*
+*.duckdb
+*.sqlite
+*.session
+tg_user*
+data/*
+!data/.gitkeep
+raw/*
+!raw/.gitkeep
+backups/
+miniapp_url.txt
+_vault_test/
+
+# ── python ──────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# ── os / editor ─────────────────────────────────────────────────
+.DS_Store

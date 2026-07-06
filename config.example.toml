@@ -1,0 +1,31 @@
+# Скопируй в config.toml и поправь под себя.
+
+[user]
+# Локальная таймзона: по ней вычисляется "день" активности (см. SPEC §5).
+timezone = "Asia/Almaty"
+
+[vault]
+# Путь до Obsidian-vault (источник правды).
+path = "~/Obsidian/Training"
+# Подпапки для типов заметок.
+daily_dir = "daily"
+workout_dir = "workouts"
+competition_dir = "competitions"
+
+[store]
+# Пересобираемый кэш. sqlite | duckdb
+backend = "duckdb"
+path = "./cache.duckdb"
+
+[paths]
+# Bronze (сырые ответы источников) и sidecar parquet. Обе в .gitignore (SPEC §4, §8).
+raw = "./raw"
+data = "./data"
+
+# Приоритет источников ПО МЕТРИКАМ при мёрдже (см. SPEC §8).
+# Чем раньше в списке — тем выше приоритет.
+[merge]
+hr        = ["garmin", "apple_health"]
+sleep     = ["garmin", "apple_health"]
+hrv       = ["garmin", "apple_health"]
+distance  = ["garmin", "apple_health"]

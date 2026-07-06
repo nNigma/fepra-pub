@@ -1,0 +1,27 @@
+[project]
+name = "training-journal"
+version = "0.1.0"
+description = "Кузница — дневник кроссфита: Telegram-бот + Mini App, биодата Garmin + LLM-разбор"
+requires-python = ">=3.12"   # garminconnect 0.3.x требует 3.12
+dependencies = [
+    "garminconnect>=0.3",   # неофициальный доступ к Garmin Connect
+    "python-frontmatter",   # чтение/запись YAML-frontmatter в md
+    "duckdb",               # пересобираемый аналитический кэш
+    "pandas",
+    "pyarrow",              # sidecar parquet для тяжёлых рядов
+    "tzdata",               # zoneinfo на системах без системной tz-базы
+]
+
+[project.optional-dependencies]
+bot = ["python-telegram-bot>=21", "fastapi", "uvicorn[standard]", "telethon", "anthropic", "httpx"]
+dev = ["pytest"]
+
+[project.scripts]
+tj = "tj.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,6 @@
+# Caddy reverse proxy + automatic HTTPS (Let's Encrypt).
+# Replace the domain with yours (e.g. a free DuckDNS subdomain pointing at this server).
+# Copy to /etc/caddy/Caddyfile, then: systemctl reload caddy
+your-domain.example.org {
+    reverse_proxy localhost:8010
+}

@@ -1,0 +1,133 @@
+"""
+Каноническая схема (vendor-agnostic). Сердце проекта — см. SPEC §5.
+
+Свои сущности, не зависящие от вендора. Каждый адаптер маппит свои поля сюда;
+чего источник не даёт — None. БД и frontmatter строятся из этих моделей.
+
+Черновик на dataclasses ради минимума зависимостей. Когда понадобится валидация
+и сериализация — кандидат на переезд в pydantic v2 (см. SPEC §13).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, date
+from enum import Enum
+
+
+class Sport(str, Enum):
+    CROSSFIT = "crossfit"
+    RUN = "run"
+    BIKE = "bike"
+    SWIM = "swim"
+    OTHER = "other"
+
+
+class Scaling(str, Enum):
+    RX = "rx"
+    SCALED = "scaled"
+
+
+class WodFormat(str, Enum):
+    FOR_TIME = "for-time"
+    AMRAP = "amrap"
+    EMOM = "emom"
+    ROUNDS = "rounds"
+    OTHER = "other"
+
+
+
+@dataclass
+class DailyMetrics:
+    """Состояние дня: сон, восстановление. Источник: часы / Apple Health."""
+    day: date
+    sleep_h: float | None = None
+    resting_hr: int | None = None
+    hrv: int | None = None
+    body_battery: int | None = None
+    readiness: int | None = None
+    stress_avg: int | None = None
+    weight_kg: float | None = None
+    extra: dict = field(default_factory=dict)
+
+
+
+@dataclass
+class EnduranceDetails:
+    """Расширение Activity для бега/вела/плавания. Источник: часы."""
+    distance_km: float | None = None
+    avg_pace_s_per_km: float | None = None
+    avg_power_w: int | None = None
+    elevation_gain_m: int | None = None
+    series_ref: str | None = None
+
+
+@dataclass
+class WodPrescription:
+    """Что ЗАДАНО. Источник: фото доски. Одинаково на всю группу. (SPEC §3)"""
+    name: str | None = None
+    format: WodFormat = WodFormat.OTHER
+    raw_text: str | None = None
+    movements: list[str] = field(default_factory=list)
+
+
+@dataclass
+class WodPerformed:
+    """Что ты СДЕЛАЛ. Источник: только ты (бот/заметка). (SPEC §3)"""
+    scaling: Scaling | None = None
+    load_kg: float | None = None
+    score: str | None = None
+    rpe: int | None = None
+    notes: str | None = None
+
+
+@dataclass
+class StrengthWodDetails:
+    """Расширение Activity для кроссфита. РАСЩЕПЛЕНО (SPEC §5)."""
+    prescription: WodPrescription = field(default_factory=WodPrescription)
+    performed: WodPerformed = field(default_factory=WodPerformed)
+
+
+@dataclass
+class Activity:
+    """Общий сеанс. start хранится с таймзоной; 'день' = по локальной tz (SPEC §5)."""
+    source: str
+    sport: Sport
+    start: datetime
+    duration_min: float | None = None
+    avg_hr: int | None = None
+    max_hr: int | None = None
+    calories: int | None = None
+    hr_zones_min: dict[int, float] | None = None
+
+    endurance: EnduranceDetails | None = None
+    strength: StrengthWodDetails | None = None
+
+    activity_id: str | None = None
+    extra: dict = field(default_factory=dict)
+
+
+
+@dataclass
+class SubjectiveLog:
+    """То, чего часы не видят — и в этом весь смысл дневника (SPEC §1)."""
+    day: date
+    feeling: int | None = None
+    motivation: int | None = None
+    soreness: int | None = None
+    sleep_quality: int | None = None
+    note: str | None = None
+
+
+@dataclass
+class Competition:
+    """Старт. Собственный шаблон — это тренерский лог, а не просто запись."""
+    day: date
+    name: str
+    sport: Sport
+    goal: str | None = None
+    result: str | None = None
+    place: int | None = None
+    conditions: str | None = None
+    splits: list[str] = field(default_factory=list)
+    reflection: str | None = None

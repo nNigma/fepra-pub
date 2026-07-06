@@ -1,0 +1,24 @@
+{
+  "tiers": ["Новичок", "Любитель", "Средний", "Продвинутый", "Элита"],
+  "tiers_en": ["Novice", "Amateur", "Intermediate", "Advanced", "Elite"],
+  "lifts": {
+    "deadlift":        {"name_ru": "Становая", "name_en": "Deadlift", "ontology": "deadlift", "m": [1.10, 1.46, 1.87, 2.34, 2.84], "f": [0.62, 0.94, 1.34, 1.82, 2.34]},
+    "back_squat":      {"name_ru": "Присед", "name_en": "Back squat", "ontology": "back_squat", "m": [0.92, 1.24, 1.62, 2.04, 2.50], "f": [0.49, 0.77, 1.14, 1.57, 2.05]},
+    "front_squat":     {"name_ru": "Фронтальный присед", "name_en": "Front squat", "ontology": "front_squat", "m": [0.74, 0.99, 1.28, 1.61, 1.97], "f": [0.49, 0.69, 0.95, 1.26, 1.58]},
+    "bench_press":     {"name_ru": "Жим лёжа", "name_en": "Bench press", "ontology": "bench_press", "m": [0.69, 0.93, 1.23, 1.57, 1.91], "f": [0.29, 0.49, 0.77, 1.11, 1.48]},
+    "shoulder_press":  {"name_ru": "Жим стоя", "name_en": "Overhead press", "ontology": "shoulder_press", "m": [0.43, 0.60, 0.80, 1.03, 1.29], "f": [0.20, 0.34, 0.52, 0.74, 0.97]},
+    "squat_snatch":    {"name_ru": "Рывок в сед", "name_en": "Squat snatch", "ontology": "squat_snatch", "m": [0.47, 0.67, 0.92, 1.21, 1.53], "f": [0.32, 0.48, 0.66, 0.89, 1.14]},
+    "power_snatch":    {"name_ru": "Рывок в стойку", "name_en": "Power snatch", "ontology": "power_snatch", "m": [0.40, 0.57, 0.78, 1.03, 1.30], "f": [0.27, 0.41, 0.56, 0.76, 0.97]},
+    "clean_floor":     {"name_ru": "Взятие с пола", "name_en": "Clean", "ontology": "clean_floor", "m": [0.69, 0.90, 1.16, 1.43, 1.73], "f": [0.49, 0.66, 0.88, 1.11, 1.35]},
+    "hang_clean":      {"name_ru": "Взятие с виса", "name_en": "Hang clean", "ontology": "hang_clean", "m": [0.61, 0.79, 1.02, 1.26, 1.52], "f": [0.43, 0.58, 0.77, 0.98, 1.19]},
+    "clean_and_jerk":  {"name_ru": "Взятие и толчок", "name_en": "Clean & jerk", "ontology": "clean_and_jerk", "m": [0.60, 0.83, 1.12, 1.47, 1.82], "f": [0.43, 0.62, 0.85, 1.11, 1.38]},
+    "overhead_squat":  {"name_ru": "Оверхэд присед", "name_en": "Overhead squat", "ontology": "overhead_squat", "m": [0.40, 0.66, 1.01, 1.43, 1.90], "f": [0.29, 0.48, 0.71, 0.98, 1.29]}
+  },
+  "benchmarks": {
+    "fran":  {"name_ru": "Fran", "name_en": "Fran", "better": "lower", "basis": "abs_sec", "spec": "21-15-9 трастер 43/30 + подтягивания", "rx_m": "43 кг", "rx_f": "30 кг", "cap_min": 15, "m": [600, 480, 330, 240, 180], "f": [720, 540, 390, 285, 210]},
+    "grace": {"name_ru": "Grace", "name_en": "Grace", "better": "lower", "basis": "abs_sec", "spec": "30 взятий+толчков на время", "rx_m": "61 кг", "rx_f": "43 кг", "cap_min": 12, "m": [360, 240, 150, 105, 75], "f": [420, 285, 180, 125, 90]},
+    "helen": {"name_ru": "Helen", "name_en": "Helen", "better": "lower", "basis": "abs_sec", "spec": "3 РФТ: бег 400м + 21 мах гири + 12 подтягиваний", "rx_m": "24 кг", "rx_f": "16 кг", "cap_min": 20, "m": [900, 720, 570, 480, 420], "f": [1020, 840, 660, 540, 480]},
+    "diane": {"name_ru": "Diane", "name_en": "Diane", "better": "lower", "basis": "abs_sec", "spec": "21-15-9 становая 102/70 + отжимания в стойке", "rx_m": "102 кг", "rx_f": "70 кг", "cap_min": 20, "m": [900, 600, 360, 240, 180], "f": [1020, 720, 450, 300, 225]},
+    "cindy": {"name_ru": "Cindy", "name_en": "Cindy", "better": "higher", "basis": "abs_rounds", "spec": "20 мин AMRAP: 5 подтягиваний + 10 отжиманий + 15 приседаний", "rx_m": "RX", "rx_f": "RX", "cap_min": 20, "m": [8, 12, 16, 20, 25], "f": [6, 10, 14, 18, 22]}
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "fran":  {"aliases": ["fran", "фрэн", "фран"], "format": "for_time", "rep_scheme": "21-15-9", "movements": ["thruster", "pull_up"], "weighted": {"thruster": {"m": 43, "f": 29}}, "score": "time", "m5": ["thruster"]},
+  "grace": {"aliases": ["grace", "грейс"], "format": "for_time", "rep_scheme": "30", "movements": ["clean_and_jerk"], "weighted": {"clean_and_jerk": {"m": 61, "f": 43}}, "score": "time", "m5": ["clean_and_jerk"]},
+  "isabel":{"aliases": ["isabel", "изабель"], "format": "for_time", "rep_scheme": "30", "movements": ["snatch"], "weighted": {"snatch": {"m": 61, "f": 43}}, "score": "time", "m5": ["snatch"]},
+  "diane": {"aliases": ["diane", "дайан", "диана"], "format": "for_time", "rep_scheme": "21-15-9", "movements": ["deadlift", "hspu"], "weighted": {"deadlift": {"m": 102, "f": 70}}, "score": "time", "m5": ["deadlift"]},
+  "elizabeth": {"aliases": ["elizabeth", "элизабет"], "format": "for_time", "rep_scheme": "21-15-9", "movements": ["clean", "ring_dip"], "weighted": {"clean": {"m": 61, "f": 43}}, "score": "time", "m5": ["clean"]},
+  "cindy": {"aliases": ["cindy", "синди"], "format": "amrap", "work_min": 20, "movements": ["pull_up", "push_up", "air_squat"], "weighted": {}, "score": "rounds_reps", "m5": []},
+  "annie": {"aliases": ["annie", "энни"], "format": "for_time", "rep_scheme": "50-40-30-20-10", "movements": ["double_under", "sit_up"], "weighted": {}, "score": "time", "m5": []},
+  "helen": {"aliases": ["helen", "хелен"], "format": "rounds_for_time", "rounds": 3, "movements": ["run", "kb_swing", "pull_up"], "weighted": {"kb_swing": {"m": 24, "f": 16}}, "score": "time", "m5": []},
+  "nancy": {"aliases": ["nancy", "нэнси"], "format": "rounds_for_time", "rounds": 5, "movements": ["run", "overhead_squat"], "weighted": {"overhead_squat": {"m": 43, "f": 29}}, "score": "time", "m5": ["overhead_squat"]},
+  "dt":    {"aliases": ["dt", "дт"], "format": "rounds_for_time", "rounds": 5, "movements": ["deadlift", "clean", "shoulder_press"], "weighted": {"deadlift": {"m": 70, "f": 47.5}}, "score": "time", "m5": []},
+  "the_seven": {"aliases": ["the seven", "севен", "the_seven"], "format": "rounds_for_time", "rounds": 7, "movements": ["hspu", "thruster", "toes_to_bar", "deadlift", "burpee", "kb_swing", "pull_up"], "weighted": {"thruster": {"m": 61, "f": 43}, "deadlift": {"m": 111, "f": 75}, "kb_swing": {"m": 32, "f": 24}}, "score": "time", "m5": []},
+  "murph": {"aliases": ["murph", "мёрф", "мерф"], "format": "for_time", "movements": ["run", "pull_up", "push_up", "air_squat"], "weighted": {}, "score": "time", "m5": []},
+  "chad":  {"aliases": ["chad", "чад"], "format": "for_time", "movements": ["box_step_up"], "weighted": {}, "score": "time", "m5": []},
+  "jt":    {"aliases": ["jt", "джей ти"], "format": "for_time", "rep_scheme": "21-15-9", "movements": ["hspu", "ring_dip", "push_up"], "weighted": {}, "score": "time", "m5": []}
+}

@@ -1,0 +1,109 @@
+"""
+Онтология движений (SPEC §10): аббревиатуры/синонимы RU+EN -> канонический id.
+Растёт со временем, переиспользуется между залами. Стартовый словарь.
+"""
+from __future__ import annotations
+
+MOVEMENTS: dict[str, list[str]] = {
+    "thruster":            ["thruster", "thrusters", "трастер", "трастеры"],
+    "pull_up":             ["pull-up", "pull up", "pullups", "подтягивание", "подтягивания"],
+    "chest_to_bar":        ["c2b", "chest-to-bar", "подтягивания до груди"],
+    "toes_to_bar":         ["t2b", "toes-to-bar", "нкп", "ноги к перекладине", "носки к перекладине"],
+    "hspu":                ["hspu", "handstand push-up", "отжимания в стойке"],
+    "wall_walk":           ["хпс", "wall walk", "хождение по стене", "хождение на руках"],
+    "double_under":        ["du", "дп", "double under", "двойные прыжки", "двойные"],
+    "single_under":        ["ос", "оп", "su", "single under", "одинарные прыжки", "одиночные прыжки"],
+    "burpee":              ["burpee", "burpees", "бёрпи", "берпи"],
+    "burpee_over_bar":     ["бчш", "б.чш", "burpee over bar", "бёрпи через штангу", "берпи через штангу"],
+    "burpee_over_parapet": ["бчп", "burpee over parapet", "бёрпи через парапет", "берпи через парапет"],
+    "box_jump":            ["box jump", "выпрыгивания на тумбу", "запрыгивания"],
+    "box_jump_over":       ["пчб", "box jump over", "прыжки через бокс", "прыжки через тумбу"],
+    "deadlift":            ["deadlift", "dl", "становая", "становая тяга"],
+    "back_squat":          ["back squat", "присед", "приседание", "приседания", "приседания со штангой",
+                            "приседание со штангой", "присед на спине", "бэк сквот", "псшнс",
+                            "присед со штангой на спине", "приседания со штангой на спине", "присед со штангой на спину"],
+    "bench_press":         ["bench", "bench press", "жим лёжа", "жим лежа", "жим штанги лёжа",
+                            "жимов лёжа", "жима лёжа", "жимы лёжа", "жимов лёжа штанги",
+                            "жим лёжа штанги", "жимов лежа", "жим лежа штанги"],
+    "shoulder_press":      ["shoulder press", "strict press", "жим стоя", "армейский жим", "жим над головой стоя"],
+    "push_press":          ["push press", "швунг", "швунги", "швунгов", "жимовой швунг", "толчковый швунг", "пуш пресс"],
+    "clean_and_jerk":      ["clean and jerk", "c&j", "взятие и толчок", "толчок", "взятие на грудь и толчок"],
+    "front_squat":         ["фр.пр", "фр пр", "front squat", "фронтальные приседания", "фронтальный присед",
+                            "фсшнс", "присед со штангой на груди", "приседания со штангой на груди", "присед на груди"],
+    "overhead_squat":      ["ohs", "оверхэд", "оверхэд-присед", "overhead squat", "присед над головой"],
+    "clean":               ["clean", "взятие", "тяга на грудь"],
+    "snatch":              ["snatch", "рывок", "рывки", "рывков"],
+    "squat_snatch":        ["рывок в сед", "рывок в разножку", "сед-рывок", "squat snatch"],
+    "power_snatch":        ["рывок в стойку", "рывок в силовую", "пауэр рывок", "power snatch"],
+    "clean_floor":         ["взятие с пола", "взятие на грудь", "взятие на грудь с пола"],
+    "hang_clean":          ["взятие с виса", "взятие с виса на грудь", "взятий с виса на грудь", "hang clean", "взятие в сед"],
+    "devil_press":         ["дж", "devil press", "дьявольский жим", "дьявольские жимы"],
+    "kb_clean_jerk":       ["взятие и толчок гирь", "взятие+толчок гирь", "толчок гирь", "kb clean and jerk"],
+    "wall_ball":           ["wall ball", "wb", "бм", "вол болл", "броски мяча"],
+    "bike":                ["байк", "bike", "эйрбайк", "air bike", "велоэргометр"],
+    "row":                 ["гребля", "row", "гребной", "rowing"],
+    "walking_lunge":       ["выпады", "walking lunge", "выпады с мячом", "lunges"],
+    "shuttle_run":         ["чб", "челночный бег", "челнок", "shuttle run", "shuttle"],
+}
+
+_LOOKUP = {alias: cid for cid, aliases in MOVEMENTS.items() for alias in aliases}
+
+CATEGORY: dict[str, str] = {
+    "thruster": "barbell", "deadlift": "barbell", "back_squat": "barbell",
+    "bench_press": "barbell", "shoulder_press": "barbell", "push_press": "barbell", "clean_and_jerk": "barbell",
+    "front_squat": "barbell", "overhead_squat": "barbell", "clean": "barbell",
+    "snatch": "barbell", "squat_snatch": "barbell", "power_snatch": "barbell",
+    "clean_floor": "barbell", "hang_clean": "barbell",
+    "devil_press": "dumbbell", "kb_clean_jerk": "kb",
+    "wall_ball": "medball", "walking_lunge": "dumbbell",
+    "pull_up": "gymnastics", "chest_to_bar": "gymnastics", "toes_to_bar": "gymnastics",
+    "hspu": "gymnastics", "wall_walk": "gymnastics", "double_under": "gymnastics",
+    "single_under": "gymnastics", "burpee": "gymnastics", "burpee_over_bar": "gymnastics",
+    "burpee_over_parapet": "gymnastics", "box_jump": "gymnastics", "box_jump_over": "gymnastics",
+    "bike": "cardio", "row": "cardio", "shuttle_run": "cardio",
+}
+_WEIGHTED_CATS = {"barbell", "dumbbell", "kb", "medball"}
+WEIGHTED = {cid for cid, cat in CATEGORY.items() if cat in _WEIGHTED_CATS}
+
+_VARIANT_FAMILY = {"snatch": "snatch", "clean": "clean"}
+
+
+def variant_family(canon: str | None) -> str | None:
+    """'snatch'|'clean' если движение общее и нужен вопрос о варианте, иначе None."""
+    return _VARIANT_FAMILY.get(canon)
+
+
+def category(canon: str | None) -> str | None:
+    return CATEGORY.get(canon) if canon else None
+
+
+def is_weighted(canon: str | None) -> bool:
+    return canon in WEIGHTED
+
+
+def resolve(text: str, aliases: dict[str, str] | None = None) -> str | None:
+    """Канонический id движения по варианту написания. aliases — runtime-словарь
+    (из БД), перекрывает/дополняет статический. Иначе None."""
+    key = text.strip().lower()
+    if aliases and key in aliases:
+        return aliases[key]
+    return _LOOKUP.get(key)
+
+
+def find(text: str, aliases: dict[str, str] | None = None) -> list[str]:
+    """Найти канон-движения ВНУТРИ свободной фразы (описательные названия из ИИ):
+    длинные алиасы первыми, с маскированием найденного. Возвращает канон-id в порядке нахождения."""
+    norm = " ".join(w.strip(" .,:;()") for w in
+                    (text or "").lower().replace("+", " ").replace("-", " ").split())
+    hay = f" {norm} "
+    lookup = dict(_LOOKUP)
+    if aliases:
+        lookup.update(aliases)
+    found: list[str] = []
+    for alias, canon in sorted(lookup.items(), key=lambda p: len(p[0].split()), reverse=True):
+        needle = f" {alias} "
+        if needle in hay:
+            if canon not in found:
+                found.append(canon)
+            hay = hay.replace(needle, " ")
+    return found
