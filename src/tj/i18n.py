@@ -628,8 +628,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "A review run is already in progress — wait for the report.",
     },
     "admin.review_no_claude": {
-        "ru": "Claude CLI на этой машине не найден — разбор недоступен.",
-        "en": "Claude CLI not found on this machine — review unavailable.",
+        "ru": "ИИ недоступен — не настроен ни один ключ (Gemini/Claude).",
+        "en": "AI unavailable — no backend configured (Gemini/Claude).",
     },
     "admin.review_done": {"ru": "Разбор полётов готов:", "en": "Flight review done:"},
     "admin.review_user_line": {

@@ -214,7 +214,7 @@ async def review_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not is_admin(uid):
         await update.effective_message.reply_text(i18n.t("admin.only_admin", lang))
         return
-    if not llm.has_claude_vision():
+    if not llm.has_llm():
         await update.effective_message.reply_text(i18n.t("admin.review_no_claude", lang))
         return
     if context.bot_data.get("review_running"):
