@@ -46,6 +46,12 @@ def _board_failed_kb(lang: str) -> InlineKeyboardMarkup:
     ]])
 
 
+def _offer_engine_choice() -> bool:
+    """Показывать ли выбор движка доски в club-флоу (Claude-vision доступен)."""
+    from .. import vision
+    return vision.has_claude()
+
+
 def club_kb(admin: bool, lang: str = "ru") -> ReplyKeyboardMarkup:
     rows = [[i18n.t("btn.club_date", lang), i18n.t("btn.club_stats", lang)]]
     if admin:
@@ -321,8 +327,10 @@ async def add_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if not vision.has_vision():
             await msg.reply_text(i18n.t("club.photo_not_recognized", lang))
             return ADD_INPUT
-        await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
-        return ADD_ENGINE
+        if _offer_engine_choice():
+            await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+            return ADD_ENGINE
+        return await _parse_add_photo(msg, context, lang, "gemini")
     text = (msg.text or "").strip()
     if _is_menu_text(text) or len(text) < 4:
         await msg.reply_text(i18n.t("club.send_text_or_photo", lang))
@@ -330,18 +338,16 @@ async def add_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await _finish_add_input(msg, context, text, "text")
 
 
-async def add_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Выбор движка распознавания программы зала: быстрый Gemini / медленный Claude."""
+async def _parse_add_photo(message, context: ContextTypes.DEFAULT_TYPE,
+                           lang: str, engine: str) -> int:
+    """Скачать фото программы зала и распознать выбранным движком. Общий код для
+    выбора движка (Claude вкл) и прямого Gemini-пути (Claude выкл)."""
     from .. import vision
-    q = update.callback_query
-    await q.answer()
-    lang = context.user_data.get("lang", "ru")
-    engine = "claude" if q.data == "ceng:slow" else "gemini"
     file_id = context.user_data.get("club_photo")
     if not file_id:
-        await q.edit_message_text(i18n.t("club.send_text_or_photo", lang))
+        await message.reply_text(i18n.t("club.send_text_or_photo", lang))
         return ADD_INPUT
-    await q.edit_message_text(i18n.t(
+    await message.reply_text(i18n.t(
         "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
     db = None
     try:
@@ -352,12 +358,21 @@ async def add_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         db = None
     raw_text = db.get("raw_text") if db else None
     if not raw_text:
-        await q.message.reply_text(i18n.t("club.photo_not_recognized", lang),
-                                   reply_markup=_board_failed_kb(lang))
+        await message.reply_text(i18n.t("club.photo_not_recognized", lang),
+                                 reply_markup=_board_failed_kb(lang))
         return ADD_INPUT
     if db.get("engine_used") and db["engine_used"] != engine:
-        await q.message.reply_text(i18n.t("record.board_engine_swapped", lang))
-    return await _finish_add_input(q.message, context, raw_text, "photo")
+        await message.reply_text(i18n.t("record.board_engine_swapped", lang))
+    return await _finish_add_input(message, context, raw_text, "photo")
+
+
+async def add_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Выбор движка распознавания программы зала: быстрый Gemini / медленный Claude."""
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    engine = "claude" if q.data == "ceng:slow" else "gemini"
+    return await _parse_add_photo(q.message, context, lang, engine)
 
 
 async def add_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -368,8 +383,10 @@ async def add_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not context.user_data.get("club_photo"):
         await q.edit_message_text(i18n.t("club.send_text_or_photo", lang))
         return ADD_INPUT
-    await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
-    return ADD_ENGINE
+    if _offer_engine_choice():
+        await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+        return ADD_ENGINE
+    return await _parse_add_photo(q.message, context, lang, "gemini")
 
 
 async def _finish_add_input(msg, context: ContextTypes.DEFAULT_TYPE, raw_text: str, source: str) -> int:
