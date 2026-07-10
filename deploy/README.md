@@ -20,7 +20,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone <your-fork-url> /opt/kuznitsa
 cd /opt/kuznitsa
 uv venv --python 3.12
-uv pip install -e '.[bot]'
+uv pip install -e '.[bot]'          # Gemini-only (default)
+# uv pip install -e '.[bot,claude]' # only if you set use_claude = true with an API key
 ```
 
 ## 3. Configure
@@ -29,6 +30,9 @@ uv pip install -e '.[bot]'
 cp .env.example .env
 # fill in TG_KUZ_BOT_TOKEN, OWNER_TG_ID, GEMINI_API_KEY, MINIAPP_URL, ... (see .env.example)
 ```
+
+`config.toml [llm].use_claude` defaults to `false` (Gemini-only) — leave it as is
+unless you want Claude-first with an API key or a logged-in CLI (see main README).
 
 Garmin token: the first sync logs in with `GARMIN_EMAIL`/`GARMIN_PASSWORD`
 (MFA handled once) and caches an OAuth token under `GARMIN_TOKENSTORE`

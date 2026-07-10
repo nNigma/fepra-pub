@@ -15,8 +15,8 @@ from pathlib import Path
 
 try:
     from zoneinfo import ZoneInfo
-except ImportError:
-    ZoneInfo = None
+except ImportError:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
 
 from .base import Adapter, Capabilities
 from ..models import (
@@ -27,6 +27,7 @@ from ..models import (
     StrengthWodDetails,
 )
 
+# typeKey Garmin -> канон Sport (SPEC §5)
 _SPORT_MAP = {
     "running": Sport.RUN,
     "trail_running": Sport.RUN,
@@ -65,6 +66,7 @@ class GarminAdapter:
         self._client = None
         self._prompt_mfa = prompt_mfa or (lambda: input("Garmin MFA-код: ").strip())
 
+    # --- авторизация (garminconnect 0.3.x, SPEC §9) ---------------------
     def _login(self):
         """
         В 0.3.x один вызов login(tokenstore) делает всё: резюмирует из сохранённого
@@ -74,7 +76,7 @@ class GarminAdapter:
         """
         if self._client is not None:
             return self._client
-        from garminconnect import Garmin
+        from garminconnect import Garmin  # ленивый импорт: тяжёлая зависимость
 
         Path(self._tokenstore).expanduser().mkdir(parents=True, exist_ok=True)
 
@@ -83,6 +85,7 @@ class GarminAdapter:
         self._client = client
         return client
 
+    # --- daily (SPEC §5, §8) --------------------------------------------
     def fetch_daily(self, day: date) -> DailyMetrics | None:
         client = self._login()
         iso = day.isoformat()
@@ -102,6 +105,7 @@ class GarminAdapter:
             "body_battery": safe(client.get_body_battery, iso),
             "max_metrics": safe(client.get_max_metrics, iso),
             "training_status": safe(client.get_training_status, iso),
+            "spo2": safe(client.get_spo2_data, iso),
         }
         self._dump_raw("daily", iso, raw)
 
@@ -136,7 +140,10 @@ class GarminAdapter:
         scores = sd.get("sleepScores") or {}
         max_m = raw.get("max_metrics") or []
         ts = raw.get("training_status") or {}
-        latest = ts.get("latestTrainingStatusData") or {}
+        # фраза статуса лежит уровнем глубже (mostRecentTrainingStatus); старый
+        # плоский вариант оставлен фолбэком
+        mrts = ts.get("mostRecentTrainingStatus") or ts
+        latest = mrts.get("latestTrainingStatusData") or {}
         ts_obj = next(iter(latest.values()), {}) if isinstance(latest, dict) else {}
 
         def _secs_to_h(x):
@@ -148,12 +155,19 @@ class GarminAdapter:
         if isinstance(max_m, list) and max_m:
             vo2 = self._g(max_m[0].get("generic") or {}, "vo2MaxPreciseValue", "vo2MaxValue")
 
+        spo = raw.get("spo2") or {}
+        resp_rest = self._g(sd, "averageRespirationValue")
+        if resp_rest is None:
+            resp_rest = self._g(sleep.get("respiration") or {}, "avgSleepRespirationValue")
+
         extra = {
+            "spo2_avg": self._int(self._g(spo, "averageSpO2", "averageSpo2")),
+            "spo2_lowest": self._int(self._g(spo, "lowestSpO2", "lowestSpo2")),
             "sleep_score": self._int(self._g(scores.get("overall") or {}, "value")),
             "sleep_deep_h": _secs_to_h(self._g(sd, "deepSleepSeconds")),
             "sleep_rem_h": _secs_to_h(self._g(sd, "remSleepSeconds")),
             "bb_charge": (self._int(bb_hi) - self._int(bb_lo)) if (bb_hi is not None and bb_lo is not None) else None,
-            "respiration_rest": self._nonneg(self._int(self._g(sleep.get("respiration") or {}, "avgSleepRespirationValue"))),
+            "respiration_rest": self._nonneg(self._int(resp_rest)),
             "vo2max": vo2,
             "hrv_status": self._g(hrv_sum or {}, "status"),
             "recovery_h": self._int(self._g(stats, "recoveryTime")),
@@ -161,6 +175,7 @@ class GarminAdapter:
         }
         extra = {k: v for k, v in extra.items() if v is not None}
 
+        # Garmin для отсутствующих метрик шлёт сентинелы -1/-2 (особенно stress) — это не данные.
         return DailyMetrics(
             day=day,
             sleep_h=self._nonneg(sleep_h),
@@ -189,6 +204,28 @@ class GarminAdapter:
                             best = point[1] if best is None else max(best, point[1])
         return best
 
+    # --- devices (для «Тюнинга часов») -----------------------------------
+    def fetch_devices(self) -> list[dict]:
+        """Устройства аккаунта: модель + capable-флаги + настройки (в ключе
+        _settings). Любая ошибка -> [] (снапшот не критичен для синка)."""
+        try:
+            client = self._login()
+            devs = client.get_devices() or []
+        except Exception:
+            return []
+        out = []
+        for d in devs:
+            if not isinstance(d, dict):
+                continue
+            dev = dict(d)
+            try:
+                dev["_settings"] = client.get_device_settings(d.get("deviceId")) or {}
+            except Exception:
+                dev["_settings"] = {}
+            out.append(dev)
+        return out
+
+    # --- activities (SPEC §4, §5, §8) -----------------------------------
     def fetch_activities(self, start: date, end: date, with_series: bool = False) -> list[Activity]:
         client = self._login()
         try:
@@ -243,6 +280,7 @@ class GarminAdapter:
                 elevation_gain_m=self._int(item.get("elevationGain")),
             )
         elif sport == Sport.CROSSFIT:
+            # Факт WOD (вес/счёт/RPE) Garmin не знает — заполняется вручную (SPEC §6).
             act.strength = StrengthWodDetails()
         zones = [self._int(item.get(f"hrTimeInZone_{i}")) for i in range(1, 6)]
         time_in_zones = [z or 0 for z in zones] if any(z is not None for z in zones) else None
@@ -272,7 +310,7 @@ class GarminAdapter:
             return None
         self._dump_raw("details", str(activity_id), details)
         try:
-            import pandas as pd
+            import pandas as pd  # ленивый импорт
         except ImportError:
             return None
         descriptors = details.get("metricDescriptors") or []
@@ -294,6 +332,7 @@ class GarminAdapter:
         pd.DataFrame(rows).to_parquet(out, index=False)
         return str(out)
 
+    # --- helpers ---------------------------------------------------------
     def _dump_raw(self, subdir, name, payload):
         out = self._raw_dir / "garmin" / subdir
         out.mkdir(parents=True, exist_ok=True)
@@ -337,4 +376,4 @@ class GarminAdapter:
         return v if isinstance(v, (int, float)) and v >= 0 else None
 
 
-_: Adapter = GarminAdapter
+_: Adapter = GarminAdapter  # type: ignore  # контроль соответствия протоколу

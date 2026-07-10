@@ -19,9 +19,9 @@ def migrate(db_path, owner_id: int) -> dict:
     changed = {"daily": False, "activities": False}
     try:
         if "tg_id" not in _cols(con, "daily"):
-            old = [c for c in _cols(con, "daily")]
+            old = [c for c in _cols(con, "daily")]           # без tg_id
             con.execute("ALTER TABLE daily RENAME TO daily_old")
-            con.execute(_DDL["daily"])
+            con.execute(_DDL["daily"])                        # новая схема с PK (tg_id, day)
             collist = ", ".join(f'"{c}"' for c in old)
             con.execute(f'INSERT INTO daily ({collist}, "tg_id") '
                         f'SELECT {collist}, ? FROM daily_old', (owner_id,))

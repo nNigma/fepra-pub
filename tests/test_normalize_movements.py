@@ -41,16 +41,26 @@ def test_alias_key_strips_weight():
     assert vision._alias_key("швунгов, 60 кг") == "швунгов"
 
 
+def test_add_alias_lowercases_alias_and_canon():
+    con = _con()
+    botdb.add_alias(con, "Гуд Морнинг", "Good_Morning", source="manual")
+    got = botdb.load_aliases(con)
+    assert got.get("гуд морнинг") == "good_morning"
+
+
 def test_enrich_aliases_learns_and_resolves(monkeypatch):
     con = _con()
     board = "4. Комплекс\n5 сетов:\n- 10 жимов гантелей сидя, 20 кг"
+    # до обучения — движение не в каноне
     _, unknown = movements_of(parse_program(board, botdb.load_aliases(con)))
     assert any("гантел" in u for u in unknown)
 
+    # enrich чистит вес перед отправкой, поэтому ключ — уже без «, 20 кг»
     monkeypatch.setattr(vision.llm, "complete",
                         lambda *a, **k: '{"жимов гантелей сидя": "shoulder_press"}')
     aliases = vision.enrich_aliases(con, board)
     canon, _ = movements_of(parse_program(board, aliases))
     assert "shoulder_press" in canon
+    # алиас сохранён — второй прогон без LLM тоже резолвит
     canon2, _ = movements_of(parse_program(board, botdb.load_aliases(con)))
     assert "shoulder_press" in canon2

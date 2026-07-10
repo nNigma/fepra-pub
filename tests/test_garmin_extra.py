@@ -84,3 +84,16 @@ def test_map_activity_partial_zones_and_sentinels():
     assert "intensity_min" not in act.extra
     assert "te_aerobic" not in act.extra
     assert "te_anaerobic" not in act.extra
+
+
+def test_map_daily_respiration_from_dailysleepdto():
+    """Реальная структура Garmin: дыхание во сне в dailySleepDTO, не в sleep.respiration."""
+    raw = {
+        "date": "2026-07-10",
+        "stats": {"restingHeartRate": 45},
+        "sleep": {"dailySleepDTO": {"sleepTimeSeconds": 21780,
+                                     "averageRespirationValue": 13.0,
+                                     "lowestRespirationValue": 9.0}},
+    }
+    m = _A._map_daily(date(2026, 7, 10), raw)
+    assert m.extra["respiration_rest"] == 13

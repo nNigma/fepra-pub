@@ -1,3 +1,4 @@
+# tests/test_edit_db.py
 from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
@@ -30,7 +31,7 @@ def test_recent_manual_only_and_order():
     botdb.insert_activity(con, _mk("2026-06-30"), tg_id=1)
     botdb.insert_activity(con, _mk("2026-06-29", source="garmin"), tg_id=1)
     rows = botdb.recent_manual_workouts(con, tg_id=1)
-    assert [r["day"] for r in rows] == ["2026-06-30", "2026-06-28"]
+    assert [r["day"] for r in rows] == ["2026-06-30", "2026-06-28"]   # garmin отсеян, новые сверху
     assert rows[0]["activity_id"] == "manual-1-2026-06-30-crossfit"
     assert rows[0]["board_source"] == "own"
 
@@ -51,7 +52,7 @@ def test_get_activity_defaults_own():
                  activity_id="manual-1-2026-06-30-run")
     botdb.insert_activity(con, a, tg_id=1)
     act = botdb.get_activity(con, "manual-1-2026-06-30-run", tg_id=1)
-    assert act["board_source"] == "own"
+    assert act["board_source"] == "own"      # extra пуст -> own
 
 
 def test_update_activity_targeted():
@@ -59,7 +60,7 @@ def test_update_activity_targeted():
     botdb.insert_activity(con, _mk("2026-06-30", score="old"), tg_id=1)
     botdb.update_activity(con, "manual-1-2026-06-30-crossfit", tg_id=1, score="new")
     act = botdb.get_activity(con, "manual-1-2026-06-30-crossfit", tg_id=1)
-    assert act["perf_score"] == "new" and act["perf_rpe"] == 7
+    assert act["perf_score"] == "new" and act["perf_rpe"] == 7     # rpe не тронут
 
 
 def test_set_activity_board_keeps_extra():
@@ -68,7 +69,7 @@ def test_set_activity_board_keeps_extra():
     botdb.set_activity_board(con, "manual-1-2026-06-30-crossfit", tg_id=1, raw_text="Фран 21-15-9", fmt="for-time")
     act = botdb.get_activity(con, "manual-1-2026-06-30-crossfit", tg_id=1)
     assert act["board_text"] == "Фран 21-15-9" and act["wod_format"] == "for-time"
-    assert act["board_source"] == "own"
+    assert act["board_source"] == "own"       # другие ключи extra целы
 
 
 def test_update_activity_clear_vs_skip_scaling():
@@ -77,8 +78,8 @@ def test_update_activity_clear_vs_skip_scaling():
     aid = "manual-1-2026-06-30-crossfit"
     botdb.update_activity(con, aid, tg_id=1, scaling="rx")
     assert botdb.get_activity(con, aid, tg_id=1)["perf_scaling"] == "rx"
-    botdb.update_activity(con, aid, tg_id=1, scaling=None)
+    botdb.update_activity(con, aid, tg_id=1, scaling=None)              # None -> очистка в NULL
     assert botdb.get_activity(con, aid, tg_id=1)["perf_scaling"] is None
     botdb.update_activity(con, aid, tg_id=1, scaling="scaled")
-    botdb.update_activity(con, aid, tg_id=1, score="x")
+    botdb.update_activity(con, aid, tg_id=1, score="x")                 # scaling не передан -> не тронут
     assert botdb.get_activity(con, aid, tg_id=1)["perf_scaling"] == "scaled"

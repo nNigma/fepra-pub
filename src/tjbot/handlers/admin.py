@@ -27,6 +27,7 @@ def admin_kb(lang: str = "ru") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [[i18n.t("btn.admin_add_user", lang), i18n.t("btn.admin_del_user", lang)],
          [i18n.t("btn.admin_stats", lang), i18n.t("btn.pro", lang)],
+         [i18n.t("btn.admin_review", lang)],
          [i18n.t("btn.back", lang)]],
         resize_keyboard=True)
 
@@ -184,6 +185,59 @@ async def del_do(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(i18n.t("admin.user_removed", lang, tg_id=uid))
 
 
+def _review_report(res: list[dict], lang: str) -> str:
+    lines = [i18n.t("admin.review_done", lang)]
+    for u in res:
+        if "error" in u and "tg_id" not in u:
+            return i18n.t("admin.review_failed", lang, err=u["error"])
+        days = u.get("days") or []
+        ok = sum(1 for d in days if d.get("ok"))
+        skipped = sum(1 for d in days if d.get("skip"))
+        errors = sum(1 for d in days if d.get("error")) + (1 if u.get("error") else 0)
+        summary = "✅" if u.get("summary") else "—"
+        lines.append(i18n.t("admin.review_user_line", lang, tg_id=u.get("tg_id"),
+                            ok=ok, skipped=skipped, errors=errors, summary=summary))
+    return "\n".join(lines)
+
+
+async def review_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """«Разбор полётов»: принудительный прогон авторазборов по всем Pro, в фоне.
+    claude-вызовы сериализуются общим файловым локом (не столкнётся с кроном)."""
+    import asyncio
+
+    from tj import llm
+
+    from .. import claude_review
+
+    uid = update.effective_user.id
+    lang = await _lang_for(context, uid)
+    if not is_admin(uid):
+        await update.effective_message.reply_text(i18n.t("admin.only_admin", lang))
+        return
+    if not llm.has_llm():
+        await update.effective_message.reply_text(i18n.t("admin.review_no_claude", lang))
+        return
+    if context.bot_data.get("review_running"):
+        await update.effective_message.reply_text(i18n.t("admin.review_busy", lang))
+        return
+    context.bot_data["review_running"] = True
+    await update.effective_message.reply_text(i18n.t("admin.review_started", lang))
+    db_path = context.bot_data["db_path"]
+    chat_id = update.effective_chat.id
+
+    async def _bg():
+        try:
+            res = await asyncio.to_thread(claude_review.run_all, db_path)
+            text = _review_report(res, lang)
+        except Exception as e:
+            text = i18n.t("admin.review_failed", lang, err=type(e).__name__)
+        finally:
+            context.bot_data["review_running"] = False
+        await context.bot.send_message(chat_id, text)
+
+    context.application.create_task(_bg())
+
+
 def _add_conv() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[MessageHandler(filters.Text(menu.btn_variants("btn.admin_add_user")), add_entry)],
@@ -200,3 +254,4 @@ def register(app) -> None:
     app.add_handler(CallbackQueryHandler(del_do, pattern=r"^delu:"))
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin_stats")), stats_open))
     app.add_handler(CallbackQueryHandler(stats_switch, pattern=r"^stats:(7|30|all)$"))
+    app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin_review")), review_run))

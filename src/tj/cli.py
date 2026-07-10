@@ -39,6 +39,7 @@ def _ingest(cfg, env, start: date, end: date, with_series: bool) -> int:
 
     n_daily = n_workout = 0
 
+    # 1) дневная биометрия — по дням
     day = start
     while day <= end:
         metrics = adapter.fetch_daily(day)
@@ -47,6 +48,7 @@ def _ingest(cfg, env, start: date, end: date, with_series: bool) -> int:
         n_daily += 1
         day += timedelta(days=1)
 
+    # 2) активности — одним запросом на весь диапазон
     for act in adapter.fetch_activities(start, end, with_series=with_series):
         base, owned = tpl.workout_frontmatter(act)
         vault_notes.upsert_note(vp["workout"] / tpl.workout_filename(act), base, owned)
@@ -125,7 +127,7 @@ def cmd_report(args):
         (folder / f"{day}.md").write_text(md, encoding="utf-8")
     old = folder.parent / "_Сводка.md"
     if old.exists():
-        old.unlink()
+        old.unlink()                       # убрать прежний одиночный файл
     print(f"report -> {folder}  (_Обзор + dashboard.html + {len(notes)} дн.)")
     return 0
 
@@ -134,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tj", description="Training Journal")
     p.add_argument("--config", default="config.toml", help="путь к config.toml")
     p.add_argument("--env", default=None,
-                   help="путь к env-файлу с кредами (по умолч.: .env, см. .env.example)")
+                   help="путь к env-файлу с кредами (по умолч.: проектный .env)")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("seed", help="бэкфилл истории")

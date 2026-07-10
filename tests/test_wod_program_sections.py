@@ -53,3 +53,44 @@ def test_template_has_strength_rounds_metcon_time_and_weight():
     assert tmpl.count("раунд") == 4
     assert tmpl.count("время (мм:сс)") == 3
     assert "вес" in tmpl and "кг" in tmpl.lower()
+
+
+PROG_OBSCHAYA = """Общая
+2 сета:
+- 20/20 сек коппенгагенская планка
+- 15 ягодичных мостов
+- 10 приседаний с резиной
+- 1 мин кардио
+2) ТА
+- Е2,5МОМ х 4 х 75%
+Приседания со штангой
+- Е1,5МОМ х 4 х 75%
+Точковый швунг
+3) 10 мин AMRAP
+20 взятий и толчков
+1000 м (гребля) / 2500 м (байк)
+макс взятий и толчков
+4) 8 раундов
+- 16 БМ
+- 12 подтягиваний"""
+
+
+def test_obschaya_warmup_skipped_no_phantom_wod():
+    b = parse_program(PROG_OBSCHAYA)
+    joined = " ".join(m["name"] for x in b for m in x["movements"]).lower()
+    assert "планка" not in joined and "мост" not in joined and "резин" not in joined
+    assert b[0]["format"] == "emom_strength"
+
+
+def test_obschaya_blocks_labeled_correctly():
+    b = parse_program(PROG_OBSCHAYA)
+    assert len(b) == 4
+    assert b[0]["format"] == "emom_strength" and b[1]["format"] == "emom_strength"
+    assert b[2]["format"] == "amrap"
+    assert b[3]["format"] == "for_time"
+    assert b[3]["header"] != "ТА"
+
+
+def test_obschaya_template_no_phantom_wod_time():
+    tmpl = render_template(parse_program(PROG_OBSCHAYA))
+    assert not tmpl.startswith("WOD:")

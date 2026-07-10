@@ -27,8 +27,8 @@ from .menu import not_menu_text, show_menu, wizard_fallbacks
 from .record_result import parse_lift
 
 
-(DATE, DATE_INPUT, SPORT, UNIVERSE_ASK, BOARD, BOARD_CONFIRM, RESULT,
- MAX_CONFIRM, MAX_EDIT, BODYWEIGHT) = range(10)
+(DATE, DATE_INPUT, SPORT, UNIVERSE_ASK, BOARD, BOARD_ENGINE, BOARD_CONFIRM, RESULT,
+ MAX_CONFIRM, MAX_EDIT, BODYWEIGHT) = range(11)
 
 _SPORTS = {"crossfit": Sport.CROSSFIT, "run": Sport.RUN, "bike": Sport.BIKE}
 
@@ -130,6 +130,26 @@ def _board_confirm_kb(lang: str) -> InlineKeyboardMarkup:
     ]])
 
 
+def _engine_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("record.btn_engine_fast", lang), callback_data="beng:fast"),
+        InlineKeyboardButton(i18n.t("record.btn_engine_slow", lang), callback_data="beng:slow"),
+    ]])
+
+
+def _board_failed_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("record.btn_retry_recognize", lang), callback_data="bretry"),
+    ]])
+
+
+def _offer_engine_choice() -> bool:
+    """Показывать ли выбор движка доски: только когда Claude-vision доступен
+    (включён и есть CLI). Иначе фото идёт сразу в Gemini."""
+    from .. import vision
+    return vision.has_claude()
+
+
 def _result_prompt(lang: str) -> str:
     return i18n.t("record.ask_result_strength", lang)
 
@@ -155,32 +175,20 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     editing = context.user_data.pop("board_editing", False)
     if msg.photo:
         context.user_data["board_photo"] = msg.photo[-1].file_id
-        draft = None
-        limited = False
-        if vision.has_vision():
-            if access.llm_quota_consume(uid):
-                await msg.reply_text(i18n.t("record.parsing_photo", lang))
-                try:
-                    f = await context.bot.get_file(msg.photo[-1].file_id)
-                    buf = await f.download_as_bytearray()
-                    draft = vision.parse_board(bytes(buf))
-                except Exception:
-                    draft = None
-            else:
-                limited = True
-        if draft and draft.get("raw_text"):
-            context.user_data["board_text"] = draft["raw_text"]
-            if draft.get("format"):
-                context.user_data["wod_format"] = draft["format"]
-            return await _ask_board_confirm(msg, context, lang)
-        context.user_data["board_text"] = "[фото доски — не распознано]"
-        head = _llm_limit_msg(lang) if limited else i18n.t("record.board_not_recognized_head", lang)
-        await msg.reply_text(head + i18n.t("record.ask_board_text_fallback", lang))
-        return BOARD
+        if not vision.has_vision():
+            context.user_data["board_text"] = "[фото доски — не распознано]"
+            await msg.reply_text(
+                i18n.t("record.board_not_recognized_head", lang)
+                + i18n.t("record.ask_board_text_fallback", lang))
+            return BOARD
+        if _offer_engine_choice():
+            await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+            return BOARD_ENGINE
+        return await _parse_board_photo(msg, context, lang, "gemini", uid)
     if msg.text and msg.text.strip().lower() != "пропустить":
         text = msg.text.strip()
         if editing:
-            context.user_data["board_text"] = text
+            context.user_data["board_text"] = text          # правку берём как есть, без ИИ
         else:
             allow = vision.has_vision() and access.llm_quota_consume(uid)
             draft = vision.parse_text(text, use_llm=allow)
@@ -188,8 +196,75 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             if draft.get("format"):
                 context.user_data["wod_format"] = draft["format"]
         return await _ask_board_confirm(msg, context, lang)
-    await msg.reply_text(_result_prompt(lang))
+    await msg.reply_text(_result_prompt(lang))                 # «пропустить» — без доски
     return RESULT
+
+
+async def _parse_board_photo(message, context: ContextTypes.DEFAULT_TYPE,
+                             lang: str, engine: str, uid: int) -> int:
+    """Скачать фото доски и распознать выбранным движком. Общий код для выбора
+    движка (Claude вкл) и прямого Gemini-пути (Claude выкл)."""
+    file_id = context.user_data.get("board_photo")
+    if not file_id:
+        await message.reply_text(_result_prompt(lang))
+        return RESULT
+    if not access.llm_quota_consume(uid):
+        context.user_data["board_text"] = "[фото доски — не распознано]"
+        await message.reply_text(_llm_limit_msg(lang) + i18n.t("record.ask_board_text_fallback", lang))
+        return BOARD
+    await message.reply_text(i18n.t(
+        "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
+    from .. import vision
+    draft = None
+    try:
+        f = await context.bot.get_file(file_id)
+        buf = await f.download_as_bytearray()
+        draft = vision.parse_board(bytes(buf), engine=engine)
+    except Exception:
+        draft = None
+    if draft and draft.get("raw_text"):
+        context.user_data["board_text"] = draft["raw_text"]
+        if draft.get("format"):
+            context.user_data["wod_format"] = draft["format"]
+        if draft.get("engine_used") and draft["engine_used"] != engine:
+            await message.reply_text(i18n.t("record.board_engine_swapped", lang))
+        return await _ask_board_confirm(message, context, lang)
+    context.user_data["board_text"] = "[фото доски — не распознано]"
+    await message.reply_text(
+        i18n.t("record.board_not_recognized_head", lang)
+        + i18n.t("record.ask_board_text_fallback", lang),
+        reply_markup=_board_failed_kb(lang))
+    return BOARD
+
+
+async def board_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Выбор движка распознавания доски: быстрый Gemini или медленный Claude."""
+    q = update.callback_query
+    await q.answer()
+    uid = update.effective_user.id
+    con = botdb.connect(context.bot_data["db_path"])
+    lang = botdb.user_lang(con, uid)
+    con.close()
+    engine = "claude" if q.data == "beng:slow" else "gemini"
+    return await _parse_board_photo(q.message, context, lang, engine, uid)
+
+
+async def board_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """«Попробовать ещё раз» после сбоя распознавания: переспрашиваем движок по
+    сохранённому фото (разовый залёт Gemini/деплой не выкидывает из распознавания)."""
+    q = update.callback_query
+    await q.answer()
+    uid = update.effective_user.id
+    con = botdb.connect(context.bot_data["db_path"])
+    lang = botdb.user_lang(con, uid)
+    con.close()
+    if not context.user_data.get("board_photo"):
+        await q.edit_message_text(_result_prompt(lang))
+        return RESULT
+    if _offer_engine_choice():
+        await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+        return BOARD_ENGINE
+    return await _parse_board_photo(q.message, context, lang, "gemini", uid)
 
 
 async def board_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -207,6 +282,7 @@ async def board_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await q.edit_message_text(i18n.t("record.board_accepted", lang))
     board_text = context.user_data.get("board_text", "")
     tmpl = None
+    context.user_data["blocks_verified"] = False
     if board_text and board_text != "[фото доски — не распознано]":
         from tj.analysis.wod_program import parse_program, render_template
         from .. import vision
@@ -216,6 +292,11 @@ async def board_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         finally:
             con.close()
         blocks = parse_program(board_text, aliases)
+        # админ = свой контент: Claude молча сверяет шаблон с доской (фолбэк — как распарсилось)
+        if blocks and vision.engine_for(q.from_user.id) == "claude" and vision.has_claude():
+            await q.message.reply_text(i18n.t("record.checking_template", lang))
+            blocks, verified = vision.verify_result_blocks(board_text, blocks, aliases)
+            context.user_data["blocks_verified"] = verified
         if blocks:
             context.user_data["result_blocks"] = blocks
             tmpl = render_template(blocks)
@@ -277,7 +358,7 @@ def _crossfit_activity(day, board_text, board_source, result_text, tz: ZoneInfo,
 
 
 async def save_filled_result(update, context, day, board_text, board_source,
-                             result_text, blocks):
+                             result_text, blocks, verified=False):
     """Сохранить заполненный результат кроссфит-тренировки: активность + метконы + максы.
     Максы пишутся сразу в уровни (record_lift_results), как в edit_workout.
     Возвращает (results, metcon_lines, activity_id). Общее для record и add_result."""
@@ -287,6 +368,8 @@ async def save_filled_result(update, context, day, board_text, board_source,
     mdata, metcon_lines = summarize_filled(blocks, result_text)
     act.extra["metcon"] = mdata
     act.extra["result_blocks"] = blocks
+    if verified:
+        act.extra["blocks_verified"] = "claude"
     con = botdb.connect(context.bot_data["db_path"])
     try:
         botdb.insert_activity(con, act, tg_id)
@@ -323,6 +406,8 @@ async def result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 act.extra = {}
             act.extra["metcon"] = mdata
             act.extra["result_blocks"] = filled_blocks
+            if context.user_data.get("blocks_verified"):
+                act.extra["blocks_verified"] = "claude"
             botdb.insert_activity(con, act, tg_id)
             maxes = extract_maxes(filled_blocks, context.user_data["result"])
             results, ambiguous = botdb.split_lifts(con, maxes)
@@ -495,7 +580,11 @@ def handler() -> ConversationHandler:
             DATE: [CallbackQueryHandler(pick_date, pattern=r"^d:")],
             DATE_INPUT: [MessageHandler(not_menu_text(), date_input)],
             SPORT: [CallbackQueryHandler(pick_sport, pattern=r"^s:")],
-            BOARD: [MessageHandler(not_menu_text() | filters.PHOTO, board)],
+            BOARD: [
+                CallbackQueryHandler(board_retry, pattern=r"^bretry$"),
+                MessageHandler(not_menu_text() | filters.PHOTO, board),
+            ],
+            BOARD_ENGINE: [CallbackQueryHandler(board_engine, pattern=r"^beng:")],
             BOARD_CONFIRM: [CallbackQueryHandler(board_confirm, pattern=r"^bconf:")],
             RESULT: [MessageHandler(not_menu_text(), result)],
             MAX_CONFIRM: [

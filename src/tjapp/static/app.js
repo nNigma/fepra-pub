@@ -20,6 +20,17 @@ async function llmCall(kind, ref, refresh){
   if(!r.ok) return {error:'fail'};
   return await r.json();
 }
+function llmSig(engine){
+  if(!engine) return '';
+  const s=engine==='claude'?T('llm.by_claude'):T('llm.by_gemini');
+  return `<div class="mut" style="font-size:11.5px;margin:1px 0 7px">${s}</div>`;
+}
+function llmShow(box, kind, ref, text, engine){
+  box.innerHTML=`<div class="llmhead">${T('llm.head')}</div>`+llmSig(engine)
+    +reviewInner(text,'llmtext')
+    +`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',1)">${T('llm.refresh')}</button>`;
+  if(kind==='summary') refreshAdvice();
+}
 async function llmGo(kind, ref, refresh){
   const box=document.getElementById('llm_'+kind);
   const H=`<div class="llmhead">${T('llm.head')}</div>`;
@@ -28,15 +39,26 @@ async function llmGo(kind, ref, refresh){
   if(!box) return;
   if(res.error==='pro'){ box.innerHTML=H+`<div class="mut">${T('llm.need_pro')}</div>`; return; }
   if(res.error==='limit'){ box.innerHTML=H+`<div class="mut">${T('llm.limit_prefix').replace('{detail}',res.detail||T('llm.limit_default'))}</div>`; return; }
-  if(res.error||!res.text){ box.innerHTML=H+`<div class="mut">${T('llm.unavailable')}</div>`; return; }
-  box.innerHTML=`<div class="llmhead">${T('llm.head')}</div>`+reviewInner(res.text,'llmtext')
-    +`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',1)">${T('llm.refresh')}</button>`;
+  if(res.error){ box.innerHTML=H+`<div class="mut">${T('llm.unavailable')}</div>`; return; }
+  if(res.text){ llmShow(box, kind, ref, res.text, res.engine); return; }
+  if(!res.pending){ box.innerHTML=H+`<div class="mut">${T('llm.unavailable')}</div>`; return; }
+  // генерация в фоне: поллим кэш, пока Месье Клод пишет (туннель не держим)
+  box.innerHTML=H+`<div class="mut">${T('llm.pending')}</div>`;
+  for(let i=0;i<50;i++){
+    await new Promise(r=>setTimeout(r,4000));
+    try{
+      const d=await api('/api/llm/'+kind+'/'+encodeURIComponent(ref));
+      if(d&&d.cached&&d.cached.text){ llmShow(box, kind, ref, d.cached.text, d.cached.engine); return; }
+    }catch(e){}
+  }
+  box.innerHTML=H+`<div class="mut">${T('llm.pending_long')}</div>`;
 }
 function llmBlock(kind, ref, pro, cached){
   if(!pro) return `<div class="mut" style="margin:10px 2px;font-size:12px">${T('llm.pro_only')}</div>`;
   const head=`<div class="llmhead">${T('llm.head')}</div>`;
-  const inner = cached
-    ? head+reviewInner(cached,'llmtext')
+  const ctext=cached&&(cached.text||cached);           // объект {text,engine} или строка (старый кэш)
+  const inner = ctext
+    ? head+llmSig(cached&&cached.engine)+reviewInner(ctext,'llmtext')
       +`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',1)">${T('llm.refresh')}</button>`
     : head+`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',0)">${T('llm.run')}</button>`;
   return `<div class="llmwrap" id="llm_${kind}">${inner}</div>`;
@@ -94,23 +116,34 @@ function loadClaude(refKey, pro, slot){
   if(!pro) return;
   fetch(withAs('/api/claude/'+encodeURIComponent(refKey)), {headers:{'X-Init-Data':INIT}})
     .then(r=>r.ok?r.json():{available:false,text:null})
-    .then(d=>{ if(!d.available) return;
+    .then(d=>{ if(!d.available||!d.text) return;
       const host=document.getElementById('claudehost_'+slot);
-      if(host) host.innerHTML=claudeBlock(d); });
+      if(host) host.innerHTML=claudeBlock(d);
+      const g=document.getElementById('llmhost_'+slot); if(g) g.style.display='none'; });
 }
 
-const METRIC_IDS=['readiness','hrv','rhr','sleep','bb','sleep_score','vo2max','acwr','monotony','strain'];
+const METRIC_IDS=['readiness','hrv','rhr','sleep','bb','sleep_score','spo2','respiration','sleep_deep','sleep_rem','vo2max','acwr','load_debt','monotony','strain'];
 function metricInfo(id){ return {name:T('metric.'+id+'.name'), desc:T('metric.'+id+'.desc')}; }
 
-function metricChartSvg(series, base, dir){
+function metricChartSvg(series, base, dir, sparse){
   if(!series||series.length<2) return `<div class="mut" style="font-size:12px;padding:6px 0">${T('chart.no_data')}</div>`;
-  const w=320,h=112,x0=6,x1=w-6,y0=8,y1=h-16,n=series.length;
+  const w=320,h=112,x1=w-6,y1=h-16,n=series.length;
+  const x0=sparse?14:24, y0=sparse?20:8;
   const vals=series.map(p=>p[1]);
-  let lo=Math.min(...vals),hi=Math.max(...vals);
+  const rawLo=Math.min(...vals),rawHi=Math.max(...vals);
+  let lo=rawLo,hi=rawHi;
   if(base!=null){lo=Math.min(lo,base);hi=Math.max(hi,base);}
   if(hi===lo)hi=lo+1;
   const pad=(hi-lo)*0.12;lo-=pad;hi+=pad;
-  const X=i=>x0+(i/(n-1))*(x1-x0),Y=v=>y1-((v-lo)/(hi-lo))*(y1-y0);
+  let X;
+  if(sparse){ // редкие точки (вес): раскладка по ДАТАМ, не по индексу
+    const t0=Date.parse(series[0][0]);
+    const span=(Date.parse(series[n-1][0])-t0)||1;
+    X=i=>x0+10+((Date.parse(series[i][0])-t0)/span)*(x1-x0-20);
+  } else {
+    X=i=>x0+(i/(n-1))*(x1-x0);
+  }
+  const Y=v=>y1-((v-lo)/(hi-lo))*(y1-y0);
   const yb=base!=null?Y(base):null;
   let area='';
   if(yb!=null){
@@ -123,7 +156,44 @@ function metricChartSvg(series, base, dir){
   let line='';
   for(let i=0;i<n-1;i++)line+=`<line x1="${X(i).toFixed(1)}" y1="${Y(series[i][1]).toFixed(1)}" x2="${X(i+1).toFixed(1)}" y2="${Y(series[i+1][1]).toFixed(1)}" stroke="var(--tx)" stroke-width="1.6" opacity=".82"/>`;
   const baseLine=yb!=null?`<line x1="${x0}" y1="${yb.toFixed(1)}" x2="${x1}" y2="${yb.toFixed(1)}" stroke="var(--mut)" stroke-width="1" stroke-dasharray="4 3"/><text x="${x1}" y="${(yb-3).toFixed(1)}" font-size="9" fill="var(--mut)" text-anchor="end">${T('chart.bench').replace('{base}',base)}</text>`:'';
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%">${area}${baseLine}${line}<text x="${x0}" y="${h-3}" font-size="9" fill="var(--mut)">${series[0][0].slice(5)}</text><text x="${x1}" y="${h-3}" font-size="9" fill="var(--mut)" text-anchor="end">${series[n-1][0].slice(5)}</text></svg>`;
+  let marks='', xlabels='', yscale='';
+  if(sparse&&n<=12){ // точка + значение над ней + дата под ней
+    marks=series.map((p,i)=>{const x=X(i),y=Y(p[1]);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--tx)"/>`+
+        `<text x="${x.toFixed(1)}" y="${(y-8).toFixed(1)}" font-size="10.5" font-weight="600" fill="var(--tx)" text-anchor="middle">${fmt(p[1])}</text>`+
+        `<text x="${x.toFixed(1)}" y="${h-3}" font-size="9" fill="var(--mut)" text-anchor="middle">${p[0].slice(5)}</text>`;}).join('');
+  } else {
+    yscale=`<text x="2" y="${(Y(rawHi)+3).toFixed(1)}" font-size="9" fill="var(--mut)">${fmt(rawHi)}</text>`+
+           `<text x="2" y="${(Y(rawLo)+3).toFixed(1)}" font-size="9" fill="var(--mut)">${fmt(rawLo)}</text>`;
+    xlabels=`<text x="${x0}" y="${h-3}" font-size="9" fill="var(--mut)">${series[0][0].slice(5)}</text><text x="${x1}" y="${h-3}" font-size="9" fill="var(--mut)" text-anchor="end">${series[n-1][0].slice(5)}</text>`;
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%">${area}${baseLine}${line}${marks}${yscale}${xlabels}</svg>`;
+}
+
+function metricOverlaySvg(sA, sB, labA, labB, baseA, baseB){
+  const clean=s=>(s||[]).filter(p=>p[1]!=null);
+  const a=clean(sA), b=clean(sB);
+  if(a.length<2&&b.length<2) return `<div class="mut" style="font-size:12px;padding:6px 0">${T('chart.no_data')}</div>`;
+  const w=320,h=112,x1=w-6,y1=h-16,x0=24,y0=8;
+  const all=a.concat(b).map(p=>p[1]).concat([baseA,baseB].filter(v=>v!=null));
+  let lo=Math.min(...all),hi=Math.max(...all); if(hi===lo)hi=lo+1;
+  const pad=(hi-lo)*0.12; lo-=pad; hi+=pad;
+  const ds=[...new Set(a.concat(b).map(p=>p[0]))].sort();
+  const t0=Date.parse(ds[0]), span=(Date.parse(ds[ds.length-1])-t0)||1;
+  const X=d=>x0+((Date.parse(d)-t0)/span)*(x1-x0);
+  const Y=v=>y1-((v-lo)/(hi-lo))*(y1-y0);
+  // низкий сон = плохо: красная заливка там, где линия НИЖЕ своей базы
+  const badArea=(s,base)=>{if(base==null||s.length<2)return '';const yb=Y(base);
+    let d=`M ${X(s[0][0]).toFixed(1)} ${yb.toFixed(1)}`;
+    for(const p of s)d+=` L ${X(p[0]).toFixed(1)} ${Math.max(Y(p[1]),yb).toFixed(1)}`;
+    d+=` L ${X(s[s.length-1][0]).toFixed(1)} ${yb.toFixed(1)} Z`;
+    return `<path d="${d}" fill="var(--red)" opacity=".16"/>`;};
+  const baseLine=(base,col)=>base==null?'':`<line x1="${x0}" y1="${Y(base).toFixed(1)}" x2="${x1}" y2="${Y(base).toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="4 3" opacity=".6"/>`;
+  const draw=(s,col)=>{let l='';for(let i=0;i<s.length-1;i++)l+=`<line x1="${X(s[i][0]).toFixed(1)}" y1="${Y(s[i][1]).toFixed(1)}" x2="${X(s[i+1][0]).toFixed(1)}" y2="${Y(s[i+1][1]).toFixed(1)}" stroke="${col}" stroke-width="1.8"/>`;return l;};
+  const cA='#378ADD', cB='#4aaa99';
+  const yscale=`<text x="2" y="${(Y(hi-pad)+3).toFixed(1)}" font-size="9" fill="var(--mut)">${fmt(hi-pad)}</text><text x="2" y="${(Y(lo+pad)+3).toFixed(1)}" font-size="9" fill="var(--mut)">${fmt(lo+pad)}</text>`;
+  const legend=`<div style="display:flex;gap:14px;justify-content:center;font-size:11px;margin-top:2px"><span><span style="display:inline-block;width:10px;height:3px;background:${cA};vertical-align:middle"></span> ${labA}</span><span><span style="display:inline-block;width:10px;height:3px;background:${cB};vertical-align:middle"></span> ${labB}</span></div>`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%">${badArea(a,baseA)}${badArea(b,baseB)}${baseLine(baseA,cA)}${baseLine(baseB,cB)}${draw(a,cA)}${draw(b,cB)}${yscale}</svg>${legend}`;
 }
 
 function toggleMetric(id){
@@ -133,8 +203,14 @@ function toggleMetric(id){
   host.dataset.open=id;
   const info=id?metricInfo(id):{name:id,desc:''};
   const md=(window.SUMMARY_METRICS||{})[id];
-  const chart=md?metricChartSvg(md.series,md.base,md.dir):'';
-  host.innerHTML=`<div class="mdetail"><div class="mdetail-hd">${info.name}${md&&md.base!=null?T('mdetail.bench').replace('{base}',md.base):''}</div><div class="mdetail-desc">${info.desc}</div>${chart}<div class="mdetail-hint">${T('mdetail.hint')}</div></div>`;
+  const dm=window.SUMMARY_METRICS||{};
+  let chart=md?metricChartSvg(md.series,md.base,md.dir):'';
+  if(id==='sleep_deep'||id==='sleep_rem')
+    chart=metricOverlaySvg((dm.sleep_deep||{}).series,(dm.sleep_rem||{}).series,T('metric.sleep_deep.name'),T('metric.sleep_rem.name'),(dm.sleep_deep||{}).base,(dm.sleep_rem||{}).base);
+  let extraLine='';
+  if(id==='hrv'&&window.HRV_STATUS_CUR)extraLine=hrvStatusHtml(window.HRV_STATUS_CUR);
+  if(id==='sleep'&&window.SLEEP_STRUCT)extraLine=sleepStructHtml(window.SLEEP_STRUCT);
+  host.innerHTML=`<div class="mdetail"><div class="mdetail-hd">${info.name}${md&&md.base!=null?T('mdetail.bench').replace('{base}',md.base):''}</div><div class="mdetail-desc">${info.desc}</div>${extraLine}${chart}<div class="mdetail-hint">${T('mdetail.hint')}</div></div>`;
   host.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -143,20 +219,67 @@ function metricsHelpHtml(){
 }
 
 const V = {green:['var(--greenb)','var(--green)'],amber:['var(--amberb)','var(--amber)'],red:['var(--redb)','var(--red)']};
+
+function adviceCard(adv){
+  if(!adv) return '';
+  const c=V[adv.level]||V.green;
+  const src=adv.source==='claude'?T('summary.advice_src_claude'):adv.source==='gemini'?T('summary.advice_src_gemini'):T('summary.advice_src_rules');
+  const dot=adv.level==='red'?'🔴':adv.level==='amber'?'🟡':'🟢';
+  const dt=adv.date?adv.date.slice(8,10)+'.'+adv.date.slice(5,7)+' · ':'';
+  const stale=adv.stale?`<div class="advice-stale">${T('summary.advice_stale')}</div>`:'';
+  return `<div class="advice" style="background:${c[0]}">
+    <div class="advice-hd"><span>${T('summary.advice_hd')}</span><span class="advice-src">${dt}${src}</span></div>
+    <div class="advice-ttl" style="color:${c[1]}">${dot} ${mdEsc(adv.title)}</div>
+    <div class="advice-txt">${mdEsc(adv.text)}</div>
+    ${stale}
+  </div>`;
+}
+
+async function refreshAdvice(){
+  const host=document.getElementById('advicehost');
+  if(!host) return;
+  try{
+    const d=await api('/api/summary');
+    if(d&&d.advice){ DATA.advice=d.advice; host.innerHTML=adviceCard(d.advice); }
+  }catch(e){}
+}
 function tier(r){return r==null?['var(--card)','var(--mut)']:r>=70?V.green:r>=45?V.amber:V.red}
 function fmt(x){return x==null?'—':(Math.round(x*10)/10)}
 function delta(d){return d==null?'':(d>=0?'+':'')+fmt(d)}
 function dcol(d,hiBad){if(d==null)return 'var(--mut)';const bad=hiBad?d>0:d<0;return bad?'var(--red)':'var(--green)'}
 function scoreSec(s){const m=/^(\d+):(\d{2})$/.exec(s||'');return m?(+m[1]*60+ +m[2]):null}
+function qEmoji(key){ const s=T(key); const i=s.indexOf(' '); return i>0?s.slice(0,i):s; }
+function qLabel(key){ const s=T(key); const i=s.indexOf(' '); return i>0?s.slice(i+1):s; }
+function microFlagsLine(flags){
+  if(!flags||!flags.length)return '';
+  const MICRO_LIMIT=new Set(['sugar_g','sodium_mg']);
+  const txt=flags.map(k=>T('nut.m_'+k.replace('_g','').replace('_mg',''))+(MICRO_LIMIT.has(k)?'↑':'↓')).join(', ');
+  return `<div style="font-size:12px;color:var(--mut);margin-top:6px">⚗️ ${txt}</div>`;
+}
 
 function tabbar(active){
   const t=(v,icon,label)=>`<a class="${active===v?'on':''}" onclick="go('${v}')"><span class="ti">${icon}</span>${label}</a>`;
-  return `<div class="tabbar">${t('summary','📊',T('tab.summary'))}${t('workouts','🏋️',T('tab.workouts'))}${t('competitions','🏆',T('tab.competitions'))}${t('goals','🎯',T('tab.goals'))}${t('leaderboard','🥇',T('tab.leaderboard'))}</div>`;
+  return `<div class="tabbar">${t('summary','📊',T('tab.summary'))}${t('workouts','🏋️',T('tab.workouts'))}${t('nutrition','🍽',T('tab.nutrition'))}${t('competitions','🏆',T('tab.competitions'))}${t('goals','🎯',T('tab.goals'))}${t('leaderboard','🥇',T('tab.leaderboard'))}</div>`;
 }
 function go(view){ history.replaceState(null,'',`?view=${view}`); load(); }
 
+const HRV_STATUS_COL={BALANCED:'var(--green)',UNBALANCED:'var(--amber)',LOW:'var(--red)',POOR:'var(--red)'};
+function hrvStatusHtml(st){
+  const key='hrv.status.'+String(st).toLowerCase();
+  const label=T(key); if(label===key) return '';
+  const col=HRV_STATUS_COL[st]||'var(--mut)';
+  return `<div style="margin-top:8px;font-size:13px">${T('metric.hrv.name')}: <b style="color:${col}">${label}</b></div>`;
+}
+function sleepStructHtml(s){
+  const bits=[];
+  if(s.deep!=null)bits.push(`${T('sleep.deep')} <b>${s.deep}</b> ${T('common.h')}`);
+  if(s.rem!=null)bits.push(`${T('sleep.rem')} <b>${s.rem}</b> ${T('common.h')}`);
+  return bits.length?`<div style="margin-top:8px;font-size:13px">${bits.join(' · ')}</div>`:'';
+}
 function renderSummary(DATA){
   window.SUMMARY_METRICS=DATA.metrics||{};
+  window.HRV_STATUS_CUR=DATA.hrv_status||null;
+  window.SLEEP_STRUCT=(DATA.sleep_deep_h!=null||DATA.sleep_rem_h!=null)?{deep:DATA.sleep_deep_h,rem:DATA.sleep_rem_h}:null;
   const m=DATA.m, vd=DATA.verdict, S=DATA.series;
   const st=DATA.state||{};
   const mc=DATA.microcycle||{};
@@ -169,6 +292,12 @@ function renderSummary(DATA){
   function metric(id,label,b,note,hiBad){const val=b?fmt(b.latest):'—';const dl=b?delta(b.delta):'';
    const tap=id?`onclick="toggleMetric('${id}')" style="cursor:pointer"`:'';
    return `<div class="mc" ${tap}><div class="l">${label}${id?' ›':''}</div><div class="v">${val} <span class="d" style="color:${b?dcol(b.delta,hiBad):'var(--mut)'}">${dl}</span></div><div class="n">${note}</div></div>`}
+
+  function metricCard(id,hiBad,unit){const md=(DATA.metrics||{})[id];
+   if(!md||!md.series||!md.series.length)return '';
+   const latest=md.series[md.series.length-1][1];
+   const dl=md.base!=null?Math.round((latest-md.base)*10)/10:null;
+   return metric(id,metricInfo(id).name,{latest,delta:dl},unit||'',hiBad)}
 
   function lensDiv(label,col){return `<div class="lens-hd"><span style="color:${col}">${label}</span><div class="lens-line" style="background:${col}22"></div></div>`}
 
@@ -205,6 +334,10 @@ function renderSummary(DATA){
   }
 
   const fo=form;
+  const wser=((DATA.metrics||{}).weight||{}).series||[];
+  const wChart=wser.length>1?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
+      <div style="font-size:10.5px;opacity:.5;margin-bottom:2px">${T('summary.weight_chart')}</div>
+      ${metricChartSvg(wser,null,'low_bad',true)}</div>`:'';
   const formHtml=`<div class="card" style="margin-bottom:8px">
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin-bottom:8px">${T('summary.form_direction')}</div>
     <div style="display:flex;justify-content:space-between;align-items:center">
@@ -212,7 +345,27 @@ function renderSummary(DATA){
       <div style="font-size:13px;color:var(--mut)">${fo.status||'—'}</div>
       <div><span style="font-weight:700">${fo.weight!=null?fo.weight:'—'}</span><span style="font-size:11px;opacity:.55;margin-left:4px">${T('summary.kg')}</span></div>
     </div>
+    ${wChart}
   </div>`;
+
+  const wt=DATA.watch_tuning;
+  let watchHtml='';
+  if(wt&&wt.watch){
+    const offItems=(wt.items||[]).filter(i=>i.state==='off');
+    const unsup=(wt.items||[]).filter(i=>i.state==='unsupported');
+    const okCount=(wt.items||[]).filter(i=>i.state==='ok').length;
+    watchHtml=`<div class="card" style="margin-bottom:8px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin-bottom:6px">${T('watch.title')}</div>
+      <div style="font-size:12.5px;color:var(--mut)">⌚ ${wt.watch}${wt.others&&wt.others.length?' + '+wt.others.join(', '):''} · ${T('watch.ok_count').replace('{ok}',okCount).replace('{total}',(wt.items||[]).length)}</div>
+      ${offItems.map(i=>`<div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--bd)">
+        <div style="font-weight:600">⚠️ ${T('watch.'+i.id+'.name')}</div>
+        <div style="font-size:12.5px;opacity:.85;margin-top:2px">${T('watch.'+i.id+'.gain')}</div>
+        <div style="font-size:12px;color:var(--amber);margin-top:3px">${T('watch.'+i.id+'.how')}</div>
+      </div>`).join('')}
+      ${offItems.length===0?`<div style="font-size:12.5px;color:var(--green);margin-top:6px">${T('watch.all_ok')}</div>`:''}
+      ${unsup.length?`<div style="font-size:11px;color:var(--mut);margin-top:8px">${T('watch.unsupported')}: ${unsup.map(i=>T('watch.'+i.id+'.name')).join(', ')}</div>`:''}
+    </div>`;
+  }
 
   const mcDays=mc.days||[];
   let mcHtml;
@@ -235,6 +388,18 @@ function renderSummary(DATA){
     <div style="display:flex;gap:18px;margin-top:9px;font-size:12px"><span>Monotony <b>${fmt(m.monotony)}</b></span><span>Strain <b>${fmt(m.strain)}</b></span></div>
   </div>`;
 
+  const mw=DATA.muscles_week;
+  let musclesHtml='';
+  if(mw&&window.BODY){
+    const idle=(mw.idle||[]).map(g=>`<span class="sp">${T('muscle.'+g)}</span>`).join('');
+    musclesHtml=`<div class="card" style="margin-bottom:8px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin-bottom:8px">${T('summary.muscles_title')}</div>
+      ${muscleMapHtml(mw)}
+      ${idle?`<div style="font-size:12px;margin-top:9px;padding-top:8px;border-top:1px solid var(--bd)"><span style="color:var(--mut)">${T('summary.muscles_idle')}</span> ${idle}</div>`:''}
+    </div>`;
+  }
+
+
   const n30Html=n30.length?`<h2>${T('summary.narrative_30d')}</h2>${n30.map(b=>`<div class="mdsec"><div class="mdh">${b.title}</div><div>${b.body}</div></div>`).join('')}`:'';
 
   const picker = DATA.is_admin ? `
@@ -243,42 +408,35 @@ function renderSummary(DATA){
       <select id="asSel"><option value="">${T('summary.view_as_self')}</option></select>
     </div>` : '';
 
-  const adv=DATA.advice;
-  let adviceHtml='';
-  if(adv){
-    const c=V[adv.level]||V.green;
-    const src=adv.source==='claude'?T('summary.advice_src_claude'):adv.source==='gemini'?T('summary.advice_src_gemini'):T('summary.advice_src_rules');
-    const dot=adv.level==='red'?'🔴':adv.level==='amber'?'🟡':'🟢';
-    const dt=adv.date?adv.date.slice(8,10)+'.'+adv.date.slice(5,7)+' · ':'';
-    const stale=adv.stale?`<div class="advice-stale">${T('summary.advice_stale')}</div>`:'';
-    adviceHtml=`<div class="advice" style="background:${c[0]}">
-      <div class="advice-hd"><span>${T('summary.advice_hd')}</span><span class="advice-src">${dt}${src}</span></div>
-      <div class="advice-ttl" style="color:${c[1]}">${dot} ${mdEsc(adv.title)}</div>
-      <div class="advice-txt">${mdEsc(adv.text)}</div>
-      ${stale}
-    </div>`;
-  }
+  const adviceHtml=`<div id="advicehost">${adviceCard(DATA.advice)}</div>`;
 
   app.innerHTML=tabbar('summary')+`
   ${picker}
   <h1>${T('summary.title')}</h1>
-  <div class="sub">${T('summary.hrmax_range').replace('{from}',DATA.range[0]).replace('{to}',DATA.range[1]).replace('{hrmax}',DATA.hr_max)}</div>
+  <div class="sub">${T('summary.on_date').replace('{day}',DATA.last_data_day||DATA.range[1]||'—').replace('{hrmax}',DATA.hr_max)}</div>
   ${heroHtml}
   ${adviceHtml}
   <div class="grid">
     ${metric('sleep',T('metric.sleep.name'),m.sleep,T('summary.sleep_note'),false)}
     ${metric('hrv',T('metric.hrv.name'),m.hrv,T('summary.hrv_note'),false)}
     ${metric('rhr',T('metric.rhr.name'),m.rhr,T('summary.rhr_note'),true)}
+    ${metric('vo2max',T('metric.vo2max.name'),m.vo2max,T('summary.vo2max_note'),false)}
+    ${metricCard('spo2',false,T('metric.spo2.note'))}
+    ${metricCard('respiration',true,T('metric.respiration.note'))}
+    ${metricCard('sleep_deep',false,T('metric.sleep_deep.note'))}
+    ${metricCard('sleep_rem',false,T('metric.sleep_rem.note'))}
   </div>
+  <div id="metricDetail" data-open=""></div>
   ${lensDiv(T('summary.lens_body'),'var(--green)')}
   ${riskHtml}
   ${sigsHtml}
   ${formHtml}
-  <div id="metricDetail" data-open=""></div>
+  ${watchHtml}
   ${lensDiv(T('summary.lens_load'),'var(--amber)')}
   <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:0 0 8px">${T('summary.microcycle_week')}</div>
   ${mcHtml}
   ${acwrHtml}
+  ${musclesHtml}
   <h2>${T('summary.cal_title')}</h2>
   <div class="leg">
     <span><span class="sw" style="background:var(--greenb)"></span>${T('summary.leg_ready')}</span>
@@ -292,11 +450,9 @@ function renderSummary(DATA){
   <h2>${T('summary.sports_title')}</h2>
   <div class="card">${DATA.sports.map(s=>`<span class="sp">${s[0]} · ${s[1]}</span>`).join('')}</div>
   ${n30Html}
-  <div id="claudehost_summary"></div>
   <div id="llmhost_summary"></div>
   ${metricsHelpHtml()}`;
 
-  loadClaude('summary',!!DATA.pro,'summary');
   loadLlm('summary','30d',!!DATA.pro);
 
   if(DATA.is_admin){
@@ -419,6 +575,26 @@ function hrLineSvg(series,hrMax){
   const y120=Y(120).toFixed(1),mn=Math.round(maxT/60),tlab=mn>=60?Math.floor(mn/60)+':'+String(mn%60).padStart(2,'0'):mn+' '+T('common.min');
   return `<svg viewBox="0 0 360 150" style="width:100%"><line x1="${x0}" y1="${y120}" x2="${x1}" y2="${y120}" stroke="var(--tx)" stroke-width="1" opacity=".35"/><text x="${x1}" y="${(+y120-3).toFixed(1)}" font-size="9" fill="var(--mut)" text-anchor="end">120</text>${segs}<text x="${x0}" y="146" font-size="9" fill="var(--mut)">0:00</text><text x="${x1}" y="146" font-size="9" fill="var(--mut)" text-anchor="end">${tlab}</text></svg>`;
 }
+const MUSCLE_SLUGS={deltoids:'shoulders',trapezius:'traps',chest:'chest',biceps:'biceps',triceps:'triceps',forearm:'forearms',abs:'abs',obliques:'obliques','upper-back':'upper_back','lower-back':'lower_back',gluteal:'glutes',quadriceps:'quads',hamstring:'hamstrings',adductors:'adductors',calves:'calves'};
+const MUSCLE_SEC='#f5b83d';
+function muscleBodySvg(parts,view,m){
+  const prim=new Set(m.primary||[]),sec=new Set(m.secondary||[]),inten=m.intensity||{};
+  const shapes=parts.map(pt=>{
+    const g=MUSCLE_SLUGS[pt.s];
+    let fill='var(--bd)',op=1;
+    if(g&&(prim.has(g)||sec.has(g))){fill=prim.has(g)?'var(--red)':MUSCLE_SEC;op=(0.35+0.65*(inten[g]||0)).toFixed(2)}
+    return pt.p.map(d=>`<path d="${d}" fill="${fill}" opacity="${op}"/>`).join('');
+  }).join('');
+  return `<svg viewBox="${view}" style="height:195px">${shapes}</svg>`;
+}
+function muscleMapHtml(m){
+  if(!m||!window.BODY)return '';
+  return `<div style="display:flex;justify-content:center;gap:22px">${muscleBodySvg(BODY.front,BODY.viewFront,m)}${muscleBodySvg(BODY.back,BODY.viewBack,m)}</div>
+  <div class="leg" style="justify-content:center;margin:8px 0 0">
+    <span><span class="sw" style="background:var(--red)"></span>${T('muscles.legend_primary')}</span>
+    <span><span class="sw" style="background:${MUSCLE_SEC}"></span>${T('muscles.legend_secondary')}</span>
+    <span><span class="sw" style="background:var(--bd)"></span>${T('muscles.legend_idle')}</span></div>`;
+}
 function renderWorkoutDetail(rep){
   const c=rep.condition;
   const heroC=c?V[c.verdict.level]:['var(--card)','var(--mut)'];
@@ -438,6 +614,16 @@ function renderWorkoutDetail(rep){
       : (()=>{const one=[chip,s.score].filter(Boolean).join(' · ');return one?`<div class="reschip">${one}</div>`:`<div class="hist">${T('workout.result_missing')}</div>`})();
     const ex=s.extra||{};
     let block='';
+    if(s.distance_km!=null||s.avg_pace_s_per_km!=null||s.avg_power_w!=null||s.elevation_gain_m!=null){
+      const paceFmt=p=>{const m=Math.floor(p/60),sec=Math.round(p%60);return m+':'+(sec<10?'0':'')+sec};
+      const et=[];
+      if(s.distance_km!=null)et.push({v:`${s.distance_km} ${T('workout.km')}`,l:T('workout.distance')});
+      if(s.avg_pace_s_per_km!=null)et.push({v:`${paceFmt(s.avg_pace_s_per_km)} ${T('workout.per_km')}`,l:T('workout.pace')});
+      if(s.avg_power_w!=null)et.push({v:`${s.avg_power_w} ${T('workout.watt')}`,l:T('workout.power')});
+      if(s.elevation_gain_m!=null)et.push({v:`${s.elevation_gain_m} ${T('workout.m')}`,l:T('workout.elevation')});
+      block+=`<div class="det-sec"><div class="det-hd">${T('workout.endurance_title')}</div>
+        <div class="det-tiles">${et.map(t=>`<div class="det-tile"><div class="det-tile-v">${t.v}</div><div class="det-tile-l">${t.l}</div></div>`).join('')}</div></div>`;
+    }
     if(ex.primary_benefit||ex.te_aerobic!=null||ex.te_anaerobic!=null){
       const teAer=ex.te_aerobic!=null?ex.te_aerobic:null;
       const teAna=ex.te_anaerobic!=null?ex.te_anaerobic:null;
@@ -489,6 +675,10 @@ function renderWorkoutDetail(rep){
       ${s.wod_name?histLine(s,rep.history[s.wod_name]):''}
     </div>`;
   });
+  if(rep.muscles&&window.BODY){
+    html+=`<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:0 0 8px">${T('workout.muscles_title')}</div>
+    <div class="card" style="margin-bottom:8px">${muscleMapHtml(rep.muscles)}</div>`;
+  }
   html+=`<div id="claudehost_workout"></div>`;
   html+=`<div id="llmhost_workout"></div>`;
   app.innerHTML=html;
@@ -537,7 +727,10 @@ function renderCompetitions(data){
       <div class="wsub">${r.date} · ${T('comp.place_of_field').replace('{place}',r.final_place).replace('{field}',r.field)}</div>
     </div>
     <div class="wchev">›</div>
-  </div>`).join('')}`;
+  </div>`).join('')}
+  <div id="llmhost_competitions"></div>`;
+
+  loadLlm('competitions','total',!!data.pro);
 
   new Chart(document.getElementById('chc'),{
     type:'line',
@@ -760,6 +953,115 @@ function renderLeaderboard(data){
   };
 }
 
+function renderNutritionDays(d){
+  const days=d.days||[];
+  const w=d.weight_kg;
+  const rows=days.length?days.map(r=>{
+    const ppk=w&&r.protein_g?Math.round(r.protein_g/w*100)/100:null;
+    return `<div class="wrow" onclick="history.replaceState(null,'','?view=nutrition_day&day=${r.day}');load()">
+      <div class="wdot" style="background:${ppk!=null&&ppk>=1.6?'var(--green)':'var(--amber)'}"></div>
+      <div class="wmain">
+        <div class="wt">${r.day} · ${Math.round(r.kcal||0)} ${T('nut.kcal')}</div>
+        <div class="wsub">${T('nut.bju')}: ${Math.round(r.protein_g||0)} / ${Math.round(r.fat_g||0)} / ${Math.round(r.carb_g||0)} ${T('nut.g')} · ${r.meals} ${T('nut.meals_n')}</div>
+      </div><span style="font-size:16px;margin-right:2px">${r.verdict?qEmoji('q.day.'+r.verdict):''}</span><div class="wchev">›</div>
+    </div>`}).join(''):`<div class="card" style="color:var(--mut);font-size:13px">${T('nut.no_meals')}</div>`;
+  app.innerHTML=tabbar('nutrition')+`
+    <h1>${T('nut.title')}</h1>
+    <div class="sub">${T('nut.days_sub')}</div>
+    ${rows}
+    <div class="foot">${T('nut.hint')}</div>`;
+}
+
+function renderNutritionDay(d){
+  const t=d.totals||{};
+  const meals=d.meals||[];
+  const ppk=d.protein_per_kg;
+  const macroTile=(label,v,unit)=>`<div class="det-tile"><div class="det-tile-v">${v}</div><div class="det-tile-l">${label}${unit?', '+unit:''}</div></div>`;
+  const mealRows=meals.length?meals.map(m=>{
+    const foods=(m.foods||[]).map(f=>`${f.name} ~${f.grams!=null?Math.round(f.grams):'—'}г`).join(', ');
+    const qBadge=m.quality?`<span style="margin-right:6px">${qEmoji('q.meal.'+m.quality)}</span>`:'';
+    const qNote=(m.quality===3||m.quality===4)
+      ?`<div style="font-size:11.5px;color:var(--mut);margin-top:3px">${qLabel('q.meal.'+m.quality)} — ${m.quality_note||''}</div>`:'';
+    return `<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><b>${(m.ts||'').slice(11,16)||'—'}</b><b>${qBadge}${Math.round(m.kcal||0)} ${T('nut.kcal')}</b></div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:3px">${foods}</div>
+      <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${T('nut.bju')}: ${Math.round(m.protein_g||0)} / ${Math.round(m.fat_g||0)} / ${Math.round(m.carb_g||0)} ${T('nut.g')}</div>
+      ${qNote}
+    </div>`}).join(''):`<div class="card" style="color:var(--mut);font-size:13px">${T('nut.no_meals')}</div>`;
+  const MICRO_T={fiber_g:30,sugar_g:50,sodium_mg:2300,iron_mg:8,calcium_mg:1000,magnesium_mg:400,potassium_mg:3500};
+  const MICRO_LIMIT=new Set(['sugar_g','sodium_mg']);
+  const microVal=k=>(MICRO_LIMIT.has(k)?'≤':'')+Math.round(t[k]||0)+'/'+MICRO_T[k];
+  const microTile=([k,l,u])=>macroTile(l,microVal(k),u);
+  const microTop=[['fiber_g',T('nut.m_fiber'),T('nut.g')],['sodium_mg',T('nut.m_sodium'),T('nut.mg')],
+    ['calcium_mg',T('nut.m_calcium'),T('nut.mg')],['potassium_mg',T('nut.m_potassium'),T('nut.mg')]];
+  const microMore=[['sugar_g',T('nut.m_sugar'),T('nut.g')],['iron_mg',T('nut.m_iron'),T('nut.mg')],
+    ['magnesium_mg',T('nut.m_magnesium'),T('nut.mg')]];
+  const microHtml=`<div class="det-tiles" style="grid-template-columns:repeat(2,1fr)">${microTop.map(microTile).join('')}</div>
+    <details style="margin-top:8px"><summary style="font-size:12px;color:var(--mut);cursor:pointer">${T('nut.micro_more')}</summary>
+    <div class="det-tiles" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${microMore.map(microTile).join('')}</div></details>`;
+  const adviceHtml=(d.advice&&d.advice.length)?`
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:14px 0 8px">${T('nut.advice_hd')}</div>
+    <div class="card">${d.advice.map(a=>`<div style="font-size:13px;margin:3px 0">• ${a}</div>`).join('')}</div>`:'';
+  let ringHtml='';
+  if(d.targets){
+    const budget=d.targets.kcal+(d.burned||0), eaten=Math.round(t.kcal||0);
+    const remain=budget-eaten, deg=Math.min(360, budget>0?eaten/budget*360:0);
+    const remTxt=remain>=0?remain:`<span style="color:var(--red)">${T('nut.over').replace('{v}',-remain)}</span>`;
+    ringHtml=`<div class="card" style="margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="text-align:center;width:76px"><div style="font-size:11px;color:var(--mut)">${T('nut.eaten')}</div><div style="font-size:18px;font-weight:700">${eaten}</div></div>
+      <div style="position:relative;width:118px;height:118px;border-radius:50%;background:conic-gradient(var(--tg-theme-button-color,#1D9E75) 0 ${deg}deg, rgba(128,128,128,.18) ${deg}deg 360deg);display:flex;align-items:center;justify-content:center">
+        <div style="width:94px;height:94px;border-radius:50%;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:10px;color:var(--mut)">${T('nut.remaining')}</div>
+          <div style="font-size:22px;font-weight:800">${remTxt}</div>
+          <div style="font-size:9px;color:var(--mut)">${T('nut.norm').replace('{v}',d.targets.kcal)}</div>
+        </div></div>
+      <div style="text-align:center;width:76px"><div style="font-size:11px;color:var(--mut)">${T('nut.burned')}</div><div style="font-size:18px;font-weight:700;color:var(--green)">+${d.burned||0}</div></div>
+    </div></div>`;
+  }
+  const mbar=(label,val,tgt,color)=>{
+    const pct=tgt?Math.min(100,Math.round(val/tgt*100)):0;
+    return `<div style="flex:1;background:rgba(128,128,128,.08);border-radius:10px;padding:8px">
+      <div style="font-size:11px;color:var(--mut)">${label}</div>
+      <div style="font-weight:700">${Math.round(val)}${tgt?'/'+tgt:''} ${T('nut.g')}</div>
+      ${tgt?`<div style="height:4px;background:rgba(128,128,128,.25);border-radius:2px;margin-top:4px"><div style="width:${pct}%;height:4px;background:${color};border-radius:2px"></div></div>`:''}
+    </div>`;
+  };
+  const macroHtml=d.targets?
+    `<div style="display:flex;gap:8px;margin-top:9px">
+      ${mbar(T('nut.protein'),t.protein_g||0,d.targets.protein_g,'#e5484d')}
+      ${mbar(T('nut.fat'),t.fat_g||0,d.targets.fat_g,'#b088f9')}
+      ${mbar(T('nut.carb'),t.carb_g||0,d.targets.carb_g,'#4c8dff')}
+    </div>`:
+    `<div class="det-tiles" style="margin-top:9px">
+      ${macroTile(T('nut.protein'),Math.round(t.protein_g||0),T('nut.g'))}
+      ${macroTile(T('nut.fat'),Math.round(t.fat_g||0),T('nut.g'))}
+      ${macroTile(T('nut.carb'),Math.round(t.carb_g||0),T('nut.g'))}
+    </div>`;
+  const waterSweat=d.water_target_l>2.2?`<span style="color:var(--mut);margin-left:6px">${T('nut.water_sweat').replace('{v}',(d.water_target_l-2.2).toFixed(1))}</span>`:'';
+  const dayVerdictHtml=d.day_verdict?`<div class="card" style="display:flex;justify-content:space-between;font-weight:700"><span>${d.day||''}</span><span>${T('q.day.'+d.day_verdict)}</span></div>`:'';
+  app.innerHTML=tabbar('nutrition')+`
+    <span class="back" onclick="go('nutrition')">← ${T('nut.title')}</span>
+    <h1>${d.day||''}</h1>
+    ${ringHtml}
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div><span style="font-size:26px;font-weight:700">${Math.round(t.kcal||0)}</span><span style="font-size:12px;opacity:.6;margin-left:4px">${T('nut.kcal')}</span></div>
+        <div style="font-size:13px;color:var(--mut)">💧 ${d.water_l!=null?d.water_l:0}${d.water_target_l!=null?' / '+d.water_target_l:''} ${T('nut.l')}${waterSweat}</div>
+      </div>
+      ${macroHtml}
+      ${ppk!=null?`<div style="font-size:12px;color:${ppk>=1.6?'var(--green)':'var(--amber)'};margin-top:7px">${T('nut.protein_per_kg').replace('{v}',ppk)}</div>`:''}
+    </div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:14px 0 8px">${T('nut.meals_hd')}</div>
+    ${mealRows}
+    ${dayVerdictHtml}
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:14px 0 8px">${T('nut.micro_hd')}</div>
+    <div class="card">${microHtml}<div style="font-size:11px;color:var(--mut);margin-top:7px">${T('nut.micro_note')}</div></div>
+    ${adviceHtml}
+    <div id="llmhost_nutr_day"></div>
+    <div class="foot">${T('nut.hint')}</div>`;
+  loadLlm('nutr_day', d.day, !!d.pro);
+}
+
 async function setLang(l){
   try{ await fetch('/api/lang',{method:'POST',headers:{'Content-Type':'application/json','X-Init-Data':INIT},body:JSON.stringify({lang:l})}); }catch(e){}
   window.LANG = l;
@@ -782,6 +1084,8 @@ async function load(){
     else if(view==='competition'){ const id=params.get('id'); if(id) renderCompetition(await api('/api/competition/'+id)); else go('competitions'); }
     else if(view==='goals') renderGoals(await api('/api/goals'));
     else if(view==='leaderboard') renderLeaderboard(await api('/api/leaderboard?metric='+(params.get('metric')||'overall')));
+    else if(view==='nutrition') renderNutritionDays(await api('/api/nutrition/days'));
+    else if(view==='nutrition_day') renderNutritionDay(await api('/api/nutrition?day='+(params.get('day')||'')));
     else {
       const data=await api('/api/summary');
       window.LANG = data.lang || 'ru';

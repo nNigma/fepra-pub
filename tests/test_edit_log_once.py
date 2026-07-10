@@ -23,6 +23,6 @@ def test_edit_logged_once_per_session(tmp_path):
     edit_workout._log_edit_once(ctx, 5)
     assert _counts(dbp) == {(5, "workout_edited"): 1}
 
-    ctx.user_data["_edit_logged"] = False
+    ctx.user_data["_edit_logged"] = False  # новая сессия правки (после pick)
     edit_workout._log_edit_once(ctx, 5)
     assert _counts(dbp) == {(5, "workout_edited"): 2}

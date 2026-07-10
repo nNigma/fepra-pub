@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from tj.analysis import standards as _standards
+from tj.analysis.nutrition import MICRO as _MICRO
 from tj.analysis.progression import epley_1rm as _epley
 from tj import ontology as _ontology
 from tj.models import Activity, DailyMetrics
@@ -26,7 +28,8 @@ _BOT_DDL = {
         "source_kind" TEXT, "thread_ref" TEXT )''',
     "wod_programs": '''CREATE TABLE IF NOT EXISTS wod_programs (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT, "day" TEXT, "gym" TEXT, "raw_text" TEXT,
-        "format" TEXT, "movements" TEXT, "source" TEXT, "confirmed" INTEGER DEFAULT 0 )''',
+        "format" TEXT, "movements" TEXT, "source" TEXT, "confirmed" INTEGER DEFAULT 0,
+        "blocks" TEXT )''',
     "goals": '''CREATE TABLE IF NOT EXISTS goals (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT, "tg_id" INTEGER, "kind" TEXT, "title" TEXT,
         "exercise" TEXT, "benchmark" TEXT, "target_value" TEXT, "metric" TEXT,
@@ -89,10 +92,24 @@ _BOT_DDL = {
         "lang" TEXT DEFAULT 'ru',
         PRIMARY KEY ("tg_id","day","source","lang") )''',
     "meta": '''CREATE TABLE IF NOT EXISTS meta ("key" TEXT PRIMARY KEY, "value" TEXT )''',
+    "water_log": '''CREATE TABLE IF NOT EXISTS water_log (
+        "tg_id" INTEGER, "day" TEXT, "liters" REAL DEFAULT 0,
+        PRIMARY KEY ("tg_id","day") )''',
+    "meals": '''CREATE TABLE IF NOT EXISTS meals (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT, "tg_id" INTEGER, "day" TEXT,
+        "ts" TEXT, "foods" TEXT, "kcal" REAL, "protein_g" REAL, "fat_g" REAL,
+        "carb_g" REAL, "note" TEXT, "photo_id" TEXT, "engine" TEXT,
+        "quality" INTEGER, "quality_note" TEXT )''',
+    "garmin_devices": '''CREATE TABLE IF NOT EXISTS garmin_devices (
+        "tg_id" INTEGER, "device_id" INTEGER, "name" TEXT, "raw" TEXT,
+        "updated_at" TEXT, PRIMARY KEY ("tg_id","device_id") )''',
     "garmin_accounts": '''CREATE TABLE IF NOT EXISTS garmin_accounts (
         "tg_id" INTEGER PRIMARY KEY, "email" TEXT, "connected_at" TEXT, "status" TEXT )''',
     "action_log": '''CREATE TABLE IF NOT EXISTS action_log (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT, "tg_id" INTEGER, "action" TEXT, "ts" TEXT )''',
+    "coach_qa": '''CREATE TABLE IF NOT EXISTS coach_qa (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT, "tg_id" INTEGER, "ts" TEXT,
+        "lang" TEXT DEFAULT 'ru', "question" TEXT, "answer" TEXT, "engine" TEXT )''',
 }
 
 
@@ -100,6 +117,9 @@ OWNER_ID = OWNER_TG_ID
 
 
 def default_db_path() -> Path:
+    override = os.environ.get("KUZ_DB_PATH")
+    if override:
+        return Path(override)
     return Path(__file__).resolve().parents[2] / "training.db"
 
 
@@ -148,11 +168,28 @@ def init_schema(con: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass
     try:
+        con.execute('ALTER TABLE users ADD COLUMN "goal" TEXT DEFAULT \'maintain\'')
+    except sqlite3.OperationalError:
+        pass
+    try:
+        con.execute('ALTER TABLE users ADD COLUMN "city" TEXT DEFAULT \'Москва\'')
+    except sqlite3.OperationalError:
+        pass
+    for col, typ in (("quality", "INTEGER"), ("quality_note", "TEXT")):
+        try:
+            con.execute(f'ALTER TABLE meals ADD COLUMN "{col}" {typ}')
+        except sqlite3.OperationalError:
+            pass
+    try:
         con.execute('ALTER TABLE llm_cache ADD COLUMN "lang" TEXT DEFAULT \'ru\'')
     except sqlite3.OperationalError:
         pass
     try:
         con.execute('ALTER TABLE disciplines ADD COLUMN "name_en" TEXT')
+    except sqlite3.OperationalError:
+        pass
+    try:
+        con.execute('ALTER TABLE wod_programs ADD COLUMN "blocks" TEXT')
     except sqlite3.OperationalError:
         pass
     for tbl in ("claude_review", "next_advice", "wk_narrative"):
@@ -266,6 +303,166 @@ def set_bodyweight(con: sqlite3.Connection, day: str, kg: float, tg_id: int) -> 
         con.execute(f"INSERT INTO daily VALUES ({ph})", vals)
     con.commit()
     mark_data_changed(con)
+
+
+def add_meal(con: sqlite3.Connection, tg_id: int, day: str, ts: str,
+             foods: list, totals: dict, note: str | None = None,
+             photo_id: str | None = None, engine: str | None = None,
+             quality: int | None = None, quality_note: str | None = None) -> int:
+    cur = con.execute(
+        'INSERT INTO meals ("tg_id","day","ts","foods","kcal","protein_g",'
+        '"fat_g","carb_g","note","photo_id","engine","quality","quality_note") '
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (tg_id, day, ts, json.dumps(foods, ensure_ascii=False),
+         totals.get("kcal"), totals.get("protein_g"), totals.get("fat_g"),
+         totals.get("carb_g"), note, photo_id, engine, quality, quality_note))
+    con.commit()
+    mark_data_changed(con)
+    return cur.lastrowid
+
+
+def meals_for_day(con: sqlite3.Connection, tg_id: int, day: str) -> list[dict]:
+    out = []
+    for r in con.execute('SELECT * FROM meals WHERE "tg_id"=? AND "day"=? ORDER BY "ts"',
+                         (tg_id, day)):
+        m = dict(r)
+        try:
+            m["foods"] = json.loads(m["foods"]) if m["foods"] else []
+        except ValueError:
+            m["foods"] = []
+        out.append(m)
+    return out
+
+
+def delete_meal(con: sqlite3.Connection, tg_id: int, meal_id: int) -> bool:
+    cur = con.execute('DELETE FROM meals WHERE "id"=? AND "tg_id"=?', (meal_id, tg_id))
+    con.commit()
+    return cur.rowcount > 0
+
+
+def nutrition_days(con: sqlite3.Connection, tg_id: int, days: int = 7,
+                   upto_day: str | None = None) -> list[dict]:
+    """Тоталы КБЖУ+микро по дням (последние `days` дней с записями, по убыванию даты)."""
+    q = ('SELECT "day", COUNT(*) meals, SUM("kcal") kcal, SUM("protein_g") protein_g, '
+         'SUM("fat_g") fat_g, SUM("carb_g") carb_g FROM meals WHERE "tg_id"=?')
+    args: list = [tg_id]
+    if upto_day:
+        q += ' AND "day"<=?'
+        args.append(upto_day)
+    q += ' GROUP BY "day" ORDER BY "day" DESC LIMIT ?'
+    args.append(days)
+    rows = [dict(r) for r in con.execute(q, args)]
+    if not rows:
+        return rows
+    day_names = [r["day"] for r in rows]
+    micro = {d: {k: 0.0 for k in _MICRO} for d in day_names}
+    ph = ",".join("?" * len(day_names))
+    for r in con.execute(
+            f'SELECT "day","foods" FROM meals WHERE "tg_id"=? AND "day" IN ({ph})',
+            [tg_id, *day_names]):
+        foods = json.loads(r["foods"]) if r["foods"] else []
+        totals = micro[r["day"]]
+        for f in foods:
+            for k in _MICRO:
+                totals[k] += f.get(k) or 0
+    for r in rows:
+        for k, v in micro[r["day"]].items():
+            r[k] = round(v, 1)
+    return rows
+
+
+def meal_qualities_by_day(con: sqlite3.Connection, tg_id: int) -> dict[str, list[dict]]:
+    """{day: [{"kcal":..,"quality":..}, ...]} по всем оценённым приёмам."""
+    out: dict[str, list[dict]] = {}
+    for r in con.execute(
+            'SELECT "day","kcal","quality" FROM meals WHERE "tg_id"=? AND "quality" IS NOT NULL',
+            (tg_id,)):
+        out.setdefault(r["day"], []).append({"kcal": r["kcal"], "quality": r["quality"]})
+    return out
+
+
+def add_water(con: sqlite3.Connection, tg_id: int, day: str, liters: float) -> float:
+    """+liters к дню (может быть отрицательным для отката). Возвращает итог дня."""
+    con.execute(
+        'INSERT INTO water_log ("tg_id","day","liters") VALUES (?,?,MAX(0,?)) '
+        'ON CONFLICT("tg_id","day") DO UPDATE SET "liters"=MAX(0, "liters"+?)',
+        (tg_id, day, liters, liters))
+    con.commit()
+    return water_for_day(con, tg_id, day)
+
+
+def water_days(con: sqlite3.Connection, tg_id: int, limit: int = 30) -> dict:
+    """{day: liters} за последние дни с записями воды."""
+    return {r["day"]: round(r["liters"], 2) for r in con.execute(
+        'SELECT "day","liters" FROM water_log WHERE "tg_id"=? '
+        'ORDER BY "day" DESC LIMIT ?', (tg_id, limit)) if r["liters"]}
+
+
+def water_for_day(con: sqlite3.Connection, tg_id: int, day: str) -> float:
+    row = con.execute('SELECT "liters" FROM water_log WHERE "tg_id"=? AND "day"=?',
+                      (tg_id, day)).fetchone()
+    return round(row["liters"], 2) if row and row["liters"] else 0.0
+
+
+def add_coach_qa(con: sqlite3.Connection, tg_id: int, ts: str, question: str,
+                 answer: str, lang: str = "ru", engine: str | None = None) -> int:
+    cur = con.execute(
+        'INSERT INTO coach_qa ("tg_id","ts","lang","question","answer","engine") '
+        "VALUES (?,?,?,?,?,?)",
+        (int(tg_id), ts, lang, question, answer, engine))
+    con.commit()
+    return cur.lastrowid
+
+
+def coach_recent(con: sqlite3.Connection, tg_id: int, limit: int = 5) -> list[dict]:
+    return [dict(r) for r in con.execute(
+        'SELECT "ts","lang","question","answer","engine" FROM coach_qa '
+        'WHERE "tg_id"=? ORDER BY "id" DESC LIMIT ?', (int(tg_id), limit))]
+
+
+def coach_count_today(con: sqlite3.Connection, tg_id: int, day: str) -> int:
+    row = con.execute('SELECT COUNT(*) FROM coach_qa WHERE "tg_id"=? AND "ts" LIKE ?',
+                      (int(tg_id), day + "%")).fetchone()
+    return row[0] if row else 0
+
+
+def save_devices(con: sqlite3.Connection, tg_id: int, devices: list) -> None:
+    """Снапшот устройств Garmin (модель + capable-флаги + настройки) для
+    «Тюнинга часов». Апсерт по (tg_id, device_id)."""
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for d in devices or []:
+        did = d.get("deviceId")
+        if did is None:
+            continue
+        con.execute(
+            'INSERT INTO garmin_devices ("tg_id","device_id","name","raw","updated_at") '
+            "VALUES (?,?,?,?,?) "
+            'ON CONFLICT("tg_id","device_id") DO UPDATE SET "name"=excluded."name", '
+            '"raw"=excluded."raw", "updated_at"=excluded."updated_at"',
+            (tg_id, did, d.get("productDisplayName"),
+             json.dumps(d, ensure_ascii=False), now))
+    con.commit()
+
+
+def load_devices(con: sqlite3.Connection, tg_id: int) -> list[dict]:
+    out = []
+    for r in con.execute('SELECT "raw" FROM garmin_devices WHERE "tg_id"=?', (tg_id,)):
+        try:
+            out.append(json.loads(r["raw"]))
+        except ValueError:
+            pass
+    return out
+
+
+def latest_weight(con: sqlite3.Connection, tg_id: int, upto_day: str | None = None):
+    """Последний известный вес атлета (кг) не позже upto_day (или вообще последний)."""
+    q = 'SELECT "weight_kg" FROM daily WHERE "tg_id"=? AND "weight_kg" IS NOT NULL'
+    args: list = [tg_id]
+    if upto_day:
+        q += ' AND "day"<=?'
+        args.append(upto_day)
+    row = con.execute(q + ' ORDER BY "day" DESC LIMIT 1', args).fetchone()
+    return row["weight_kg"] if row else None
 
 
 def set_self_feel(con: sqlite3.Connection, day: str, score: int, tg_id: int) -> None:
@@ -392,6 +589,32 @@ def set_astro(con: sqlite3.Connection, tg_id: int, on: bool) -> None:
     con.commit()
 
 
+GOALS = ("cut", "maintain", "bulk", "recomp")
+
+
+def user_goal(con: sqlite3.Connection, tg_id: int) -> str:
+    row = con.execute('SELECT "goal" FROM users WHERE "tg_id"=?', (int(tg_id),)).fetchone()
+    g = (row["goal"] if row else None) or "maintain"
+    return g if g in GOALS else "maintain"
+
+
+def set_goal(con: sqlite3.Connection, tg_id: int, goal: str) -> None:
+    if goal not in GOALS:
+        raise ValueError(f"bad goal: {goal!r}")
+    con.execute('UPDATE users SET "goal"=? WHERE "tg_id"=?', (goal, int(tg_id)))
+    con.commit()
+
+
+def user_city(con: sqlite3.Connection, tg_id: int) -> str:
+    row = con.execute('SELECT "city" FROM users WHERE "tg_id"=?', (int(tg_id),)).fetchone()
+    return (row["city"] if row else None) or "Москва"
+
+
+def set_city(con: sqlite3.Connection, tg_id: int, city: str) -> None:
+    con.execute('UPDATE users SET "city"=? WHERE "tg_id"=?', (city.strip()[:60], int(tg_id)))
+    con.commit()
+
+
 def all_users(con: sqlite3.Connection) -> list[dict]:
     rows = con.execute('SELECT "tg_id","nick" FROM users ORDER BY "nick"').fetchall()
     return [{"tg_id": r["tg_id"], "nick": r["nick"]} for r in rows]
@@ -426,15 +649,19 @@ def profile_hr_sex(con: sqlite3.Connection, tg_id: int) -> tuple[int, str]:
     return hr_max, sex
 
 
+# --- программа зала (Universe) — wod_programs --------------------------------
 
 def add_program(con: sqlite3.Connection, day, gym, raw_text, fmt="other",
-                movements=None, source="photo", confirmed=0) -> int:
+                movements=None, source="photo", confirmed=0, blocks=None) -> int:
+    """blocks — выверенные Клодом блоки шаблона результатов (JSON); NULL, если
+    проверка не прошла — потребители тогда перепарсивают raw_text."""
     cur = con.execute(
         'INSERT INTO wod_programs '
-        '("day","gym","raw_text","format","movements","source","confirmed") '
-        "VALUES (?,?,?,?,?,?,?)",
+        '("day","gym","raw_text","format","movements","source","confirmed","blocks") '
+        "VALUES (?,?,?,?,?,?,?,?)",
         (day, gym, raw_text, fmt, json.dumps(movements or [], ensure_ascii=False),
-         source, confirmed),
+         source, confirmed,
+         json.dumps(blocks, ensure_ascii=False) if blocks else None),
     )
     con.commit()
     return cur.lastrowid
@@ -468,7 +695,7 @@ def add_alias(con: sqlite3.Connection, alias: str, canon: str, source: str = "ma
     con.execute(
         'INSERT OR REPLACE INTO movement_aliases ("alias","canon","source","created_at") '
         "VALUES (?,?,?,?)",
-        (alias.strip().lower(), canon, source,
+        (alias.strip().lower(), canon.strip().lower(), source,
          datetime.now(timezone.utc).isoformat(timespec="seconds")))
     con.commit()
 
@@ -699,11 +926,17 @@ def lifts_to_results(con, parsed) -> list:
         if weight <= 0 or reps <= 0:
             continue
         movement = str(item.get("movement") or "")
+        # точный алиас, иначе — скан канонов внутри описательной фразы (последний лифт;
+        # для комплекса «взятие+толчок» это clean_and_jerk, а не просто clean)
         canon = _ontology.resolve(movement, aliases)
         did = onto_to_disc.get(canon)
         if not did:
             lift_canons = [c for c in _ontology.find(movement, aliases) if c in onto_to_disc]
-            did = onto_to_disc.get(lift_canons[-1]) if lift_canons else None
+            # комплекс «взятие + толчок» = clean_and_jerk (толчок задаёт движение)
+            if "clean_and_jerk" in lift_canons:
+                did = onto_to_disc["clean_and_jerk"]
+            elif lift_canons:
+                did = onto_to_disc.get(lift_canons[-1])
         if not did:
             continue
         out.append({"discipline": did, "name": discs[did]["name_ru"],
@@ -760,11 +993,12 @@ def record_lift_results(con, tg_id, results, day, activity_id) -> int:
     return len(results)
 
 
-def llm_cache_get(con, tg_id, kind, ref_key, data_hash, lang="ru") -> str | None:
+def llm_cache_get(con, tg_id, kind, ref_key, data_hash, lang="ru") -> dict | None:
+    """-> {"text", "engine"} | None. engine — кто писал разбор (claude/gemini)."""
     row = con.execute(
-        'SELECT content FROM llm_cache WHERE tg_id=? AND kind=? AND ref_key=? AND data_hash=? AND lang=?',
+        'SELECT content, model FROM llm_cache WHERE tg_id=? AND kind=? AND ref_key=? AND data_hash=? AND lang=?',
         (tg_id, kind, ref_key, data_hash, lang)).fetchone()
-    return row["content"] if row else None
+    return {"text": row["content"], "engine": row["model"]} if row else None
 
 
 def llm_cache_delete(con, tg_id, kind, ref_key) -> None:

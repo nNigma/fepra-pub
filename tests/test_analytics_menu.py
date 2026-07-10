@@ -14,6 +14,6 @@ def test_analytics_kb_layout():
 def test_goal_and_feel_in_main_menu():
     from tj import i18n
     from tjbot.handlers.menu import main_kb
-    texts = [b.text for row in main_kb(11111111, "ru").keyboard for b in row]
+    texts = [b.text for row in main_kb(12345678, "ru").keyboard for b in row]
     for t in (i18n.t("btn.goal_single", "ru"), i18n.t("btn.feel", "ru")):
         assert t in texts, t

@@ -8,5 +8,5 @@ def test_profile_hr_sex(tmp_path):
 
 def test_profile_hr_sex_fallback(tmp_path):
     con = botdb.connect(tmp_path / "t.db"); botdb.init_schema(con)
-    hr, sex = botdb.profile_hr_sex(con, 999)
+    hr, sex = botdb.profile_hr_sex(con, 999)  # нет профиля
     assert hr == 184 and sex == "m"

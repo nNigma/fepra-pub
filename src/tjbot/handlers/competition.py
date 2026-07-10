@@ -459,7 +459,8 @@ async def fill_stage_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         f = await context.bot.get_file(update.message.photo[-1].file_id)
         buf = await f.download_as_bytearray()
-        stages = vision.parse_stages(bytes(buf))
+        stages = vision.parse_stages(bytes(buf),
+                                     engine=vision.engine_for(update.effective_user.id))
     except Exception:
         stages = None
     if not stages:
@@ -523,7 +524,8 @@ async def fill_result_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     try:
         f = await context.bot.get_file(update.message.photo[-1].file_id)
         buf = await f.download_as_bytearray()
-        res = vision.parse_results(bytes(buf), fill["athlete"])
+        res = vision.parse_results(bytes(buf), fill["athlete"],
+                                   engine=vision.engine_for(update.effective_user.id))
     except Exception:
         res = None
     rows = (res or {}).get("rows") or []

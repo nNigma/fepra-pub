@@ -17,10 +17,10 @@ def test_emom_plain_with_duration():
 
 
 def test_emom_interval_digit_glyph():
-    n = parse_notation("EZMOM x 5 x 5 x 65%")
+    n = parse_notation("EZMOM x 5 x 5 x 65%")     # рукописная 2 -> Z
     assert n["format"] == "emom_strength" and n["rounds"] == 5 and n["reps"] == 5
     assert parse_notation("EZ MOM x 5 x 5")["rounds"] == 5
-    assert parse_notation("ESMOM x 3")["rounds"] == 3
+    assert parse_notation("ESMOM x 3")["rounds"] == 3   # S -> 5
 
 
 def test_emom_rounds_only_percent_second():
@@ -69,9 +69,9 @@ def test_parse_weight_reps():
 
 
 def test_parse_weight_reps_cyrillic_x():
-    assert parse_weight_reps("75 х 5") == (75.0, 5)
+    assert parse_weight_reps("75 х 5") == (75.0, 5)     # Cyrillic х U+0445
     assert parse_weight_reps("77.5 х 1") == (77.5, 1)
-    assert parse_weight_reps("80×5") == (80.0, 5)
+    assert parse_weight_reps("80×5") == (80.0, 5)       # regression: latin/× still work
     assert parse_weight_reps("80x3") == (80.0, 3)
 
 
@@ -82,7 +82,7 @@ def test_rep_scheme():
 
 
 def test_rep_scheme_with_block_marker():
-    assert parse_notation("3 21-15-9")["scheme"] == [21, 15, 9]
+    assert parse_notation("3 21-15-9")["scheme"] == [21, 15, 9]     # ведущий номер блока
     assert parse_notation("(3) 21-15-9")["scheme"] == [21, 15, 9]
 
 
@@ -91,4 +91,4 @@ def test_percent_range_is_not_scheme():
 
 
 def test_weight_ramp_line_is_not_scheme():
-    assert parse_notation("становая 100-110-130") is None
+    assert parse_notation("становая 100-110-130") is None          # раскладка веса, не схема

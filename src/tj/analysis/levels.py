@@ -136,6 +136,7 @@ def goals_screen_data(con, tg_id, sex, bodyweight, lang="ru") -> dict:
             assessed_tiers.append({"idx": card["idx"], "unit": meta["unit"]})
         (lifts if meta["kind"] == "lift" else benchmarks).append(card)
 
+    # заполненные первыми, по убыванию (лифты по макс-весу, бенчмарки по тиру); пустые вниз
     lifts.sort(key=lambda c: (not c["has_data"], -(c["value"] or 0)))
     benchmarks.sort(key=lambda c: (not c["has_data"], -(c["idx"] if c["idx"] is not None else -1)))
 

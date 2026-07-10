@@ -20,8 +20,8 @@ def test_lifts_to_results_scans_descriptive_phrases():
         {"movement": "фронтальный присед с гантелью", "weight_kg": 20, "reps": 15},
     ]
     discs = {r["discipline"] for r in botdb.lifts_to_results(con, parsed)}
-    assert "back_squat" in discs
-    assert "clean_and_jerk" in discs
+    assert "back_squat" in discs          # «приседание …» (не точный алиас) → скан
+    assert "clean_and_jerk" in discs      # комплекс «взятие+толчок» → толчок, не просто clean
     assert "front_squat" in discs
 
 

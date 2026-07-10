@@ -29,3 +29,11 @@ hr        = ["garmin", "apple_health"]
 sleep     = ["garmin", "apple_health"]
 hrv       = ["garmin", "apple_health"]
 distance  = ["garmin", "apple_health"]
+
+[llm]
+# AI-движок разборов и распознавания фото.
+#   false — всё через Gemini (нужен только GEMINI_API_KEY, работает из коробки).
+#   true  — Claude-first, Gemini как фолбэк. Требует ЛИБО установленный и
+#           залогиненный Claude Code CLI (claude в PATH / CLAUDE_BIN),
+#           ЛИБО ANTHROPIC_API_KEY в .env (только текстовые разборы).
+use_claude = false

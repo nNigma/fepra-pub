@@ -5,10 +5,10 @@
 """
 from __future__ import annotations
 
-from tj.analysis.activity_stats import (
+from tj.analysis.activity_stats import (  # noqa: F401  реэкспорт ключей действий
     WORKOUT_RECORDED, WORKOUT_EDITED, RESULT_ADDED, GOAL_SET,
     GARMIN_SYNC, GARMIN_HISTORY, GARMIN_CONNECTED,
-    LLM_REVIEW, MINIAPP_OPEN, COMP_ADDED, CLUB_PROGRAM_ADDED,
+    LLM_REVIEW, MINIAPP_OPEN, COMP_ADDED, CLUB_PROGRAM_ADDED, MEAL_ADDED,
 )
 
 from . import db as botdb

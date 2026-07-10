@@ -12,8 +12,8 @@ def test_pending_scoped_by_user(tmp_path):
     con = botdb.connect(tmp_path / "t.db"); botdb.init_schema(con)
     _act(con, 111, "2026-07-01")
     _act(con, 222, "2026-07-02")
-    botdb.claude_review_put(con, 111, "2026-07-01", "готов")
+    botdb.claude_review_put(con, 111, "2026-07-01", "готов")  # у 111 разбор есть
     pend111 = botdb.claude_reviews_pending(con, 111)
     pend222 = botdb.claude_reviews_pending(con, 222)
-    assert pend111 == []
-    assert [p["day"] for p in pend222] == ["2026-07-02"]
+    assert pend111 == []  # у 111 всё разобрано
+    assert [p["day"] for p in pend222] == ["2026-07-02"]  # у 222 день без разбора

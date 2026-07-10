@@ -78,6 +78,7 @@ def _baseline(vals, window: int = 28):
     return {"latest": round(latest, 1), "base": round(base, 1), "delta": round(latest - base, 1)}
 
 
+# --- форматирование текстового отчёта (tj analyze) ---------------------------
 
 def _acwr_zone(v):
     if v is None:

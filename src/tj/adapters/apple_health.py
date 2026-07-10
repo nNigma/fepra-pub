@@ -17,11 +17,11 @@ class AppleHealthAdapter:
     capabilities = Capabilities(
         daily=True,
         activities=True,
-        metrics={"hrv", "resting_hr", "sleep"},
+        metrics={"hrv", "resting_hr", "sleep"},   # без body_battery/readiness
     )
 
     def __init__(self, export_dir: str, tz: str):
-        self._export_dir = export_dir
+        self._export_dir = export_dir   # папка, куда приложение льёт JSON
         self._tz = tz
 
     def fetch_daily(self, day: date) -> DailyMetrics | None:

@@ -89,6 +89,15 @@ def test_movements_of():
     assert canon == list(dict.fromkeys(canon))
 
 
+def test_alternative_reps_line_keeps_both_movements():
+    # «50 ДП или 75 ОП» — альтернатива: должны попасть оба движения
+    from tj.analysis.wod_program import parse_program, movements_of
+    board = "WOD N1\n10-8-6-4-2\nОверхед\n50 ДП или 75 ОП\n"
+    canon, _ = movements_of(parse_program(board))
+    assert "overhead_squat" in canon
+    assert "double_under" in canon and "single_under" in canon
+
+
 def test_ladder_block_no_junk_movement():
     board = "3 WOD\n21-15-9\n- становая тяга\n- гребля\n- бёрпи\n"
     blocks = parse_program(board)
@@ -96,7 +105,7 @@ def test_ladder_block_no_junk_movement():
     assert wod["scheme"] == [21, 15, 9] and wod["rounds"] == 3
     names = [m["name"] for m in wod["movements"]]
     assert "становая тяга" in names and "гребля" in names and "бёрпи" in names
-    assert all("15-9" not in n for n in names)
+    assert all("15-9" not in n for n in names)     # мусорного движения нет
 
 
 def test_annotate_rep_scheme():

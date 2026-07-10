@@ -13,8 +13,9 @@ from telegram.ext import Application
 
 from tj import config as cfgmod
 from . import db as botdb
-from .handlers import (add_result, admin, club, competition, edit_workout, garmin as garmin_h,
-                       goal, menu, onboarding, pro, program, record_workout)
+from .handlers import (add_result, admin, bodyweight, club, coach, competition,
+                       edit_workout, garmin as garmin_h, goal, meal, menu,
+                       nutrition_profile, onboarding, pro, program, record_workout)
 from .handlers import self_feel as self_feel_h
 
 
@@ -50,6 +51,7 @@ def build_application() -> Application:
     app.add_handler(onboarding.handler())
     app.add_handler(record_workout.handler())
     app.add_handler(add_result.handler())
+    app.add_handler(bodyweight.handler())
     app.add_handler(edit_workout.handler())
     app.add_handler(goal.handler())
     app.add_handler(garmin_h.handler())
@@ -59,6 +61,9 @@ def build_application() -> Application:
     admin.register(app)
     for h in program.handlers():
         app.add_handler(h)
+    meal.register(app)      # до register_stubs: подменю Питания перекрывает заглушку
+    coach.register(app)
+    nutrition_profile.register(app)
     menu.register_stubs(app)
     self_feel_h.register(app)
     from .handlers import lift_disambig

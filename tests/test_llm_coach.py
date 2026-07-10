@@ -46,3 +46,20 @@ def test_coach_workout_falls_back_without_llm(monkeypatch):
 def test_coach_workout_returns_text(monkeypatch):
     monkeypatch.setattr(llm_coach.llm, "complete", lambda system, user, **k: "ТЕКСТ")
     assert llm_coach.coach_workout(llm_coach.workout_payload(_REPORT)) == "ТЕКСТ"
+
+
+def test_coach_claude_first(monkeypatch):
+    from tj import llm
+    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: "от клода")
+    text, engine = llm_coach.coach("summary", {"x": 1})
+    assert text == "от клода" and engine == "claude"
+
+
+def test_coach_falls_back_to_gemini(monkeypatch):
+    from tj import llm
+    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: None)
+    monkeypatch.setattr(llm, "complete",
+                        lambda s, u, max_output_tokens=800: "от жени")
+    for kind in ("workout", "summary", "competitions"):
+        text, engine = llm_coach.coach(kind, {"x": 1})
+        assert text == "от жени" and engine == "gemini"

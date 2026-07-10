@@ -6,7 +6,7 @@ from tjbot import db
 def test_next_advice_ru_en_coexist(tmp_path):
     con = db.connect(str(tmp_path / "t.db")); db.init_schema(con)
     db.next_advice_put(con, 1, "claude", "русский совет", lang="ru")
-    db.next_advice_put(con, 1, "claude", "english advice", lang="en")
+    db.next_advice_put(con, 1, "claude", "english advice", lang="en")   # раньше падало по PK
     assert db.next_advice_get(con, 1, "ru")["text"] == "русский совет"
     assert db.next_advice_get(con, 1, "en")["text"] == "english advice"
 
@@ -28,6 +28,7 @@ def test_wk_narrative_ru_en_coexist(tmp_path):
 
 
 def test_migration_preserves_old_rows(tmp_path):
+    # старая схема без lang в PK -> init_schema перестраивает, данные целы
     con = db.connect(str(tmp_path / "t.db"))
     con.execute('CREATE TABLE next_advice ("tg_id" INTEGER, "source" TEXT, "text" TEXT, '
                 '"created_at" TEXT, "lang" TEXT DEFAULT \'ru\', PRIMARY KEY ("tg_id","source"))')

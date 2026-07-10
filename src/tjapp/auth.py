@@ -43,6 +43,8 @@ def validate_init_data(init_data: str, token: str | None = None, max_age_s: int 
         dcs = "\n".join(f"{k}={p[k]}" for k in sorted(p))
         return hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
 
+    # По спецификации data-check-string — все поля кроме hash (signature включён).
+    # Часть клиентов считает hash без signature — пробуем и так (устойчиво к обоим).
     ok = hmac.compare_digest(_calc(pairs), received)
     if not ok and "signature" in pairs:
         ok = hmac.compare_digest(

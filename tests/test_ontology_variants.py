@@ -10,11 +10,31 @@ def test_specific_variants_resolve():
     assert o.resolve("взятие с пола") == "clean_floor"
     assert o.resolve("взятие на грудь") == "clean_floor"
     assert o.resolve("overhead squat") == "overhead_squat"
+    assert o.resolve("Оверхед") == "overhead_squat"
+    assert o.resolve("оверхед присед") == "overhead_squat"
 
 
 def test_generic_stays_generic():
     assert o.resolve("рывок") == "snatch"
     assert o.resolve("взятие") == "clean"
+
+
+def test_expanded_goal_lift_aliases():
+    assert o.resolve("дэдлифт") == "deadlift"
+    assert o.resolve("псшнс") == "back_squat"
+    assert o.resolve("фр. пр") == "front_squat"
+    assert o.resolve("бенч") == "bench_press"
+    assert o.resolve("военный жим") == "shoulder_press"
+    assert o.resolve("силовой рывок") == "power_snatch"
+    assert o.resolve("рывок в глубокий сед") == "squat_snatch"
+    assert o.resolve("толчок в ножницы") == "clean_and_jerk"
+    assert o.resolve("взятие+толчок") == "clean_and_jerk"
+
+
+def test_vzyatie_v_sed_is_squat_clean_not_hang():
+    # «в сед» — про глубину (squat clean с пола), а не про вис
+    assert o.resolve("взятие в сед") == "clean_floor"
+    assert o.resolve("взятие с виса в сед") == "hang_clean"
 
 
 def test_bench_declensions_and_order():

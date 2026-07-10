@@ -72,7 +72,7 @@ def build(vault_dir: Path, db_path: Path, backend: str = "duckdb", tg_id: int = 
         try:
             meta, _body = read_note(note)
         except Exception:
-            continue
+            continue                       # битую/недописанную заметку пропускаем
         ntype = meta.get("type")
         if ntype == "training-day":
             rows["daily"].append(_row_daily(meta, tg_id))

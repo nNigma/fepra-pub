@@ -5,10 +5,11 @@ HTML-дашборда Obsidian). Доступ к API — по валидному
 """
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -21,6 +22,9 @@ from tj.analysis.levels import goals_screen_data
 from tj.analysis.workouts import recent_workouts, workout_report
 from tj.analysis import llm_coach
 from tj.analysis import activity_stats as _stats
+from tj.analysis import watch_advice as _watch
+from tj.analysis import nutrition as _nutr
+from tj.analysis import nutrition_goals as ng
 from tjbot import db as botdb
 from tjbot.access import LLM_DAILY_LIMIT, is_admin, is_pro, llm_quota_consume, llm_quota_remaining
 from .auth import AuthError, authorized_user, resolve_effective_user
@@ -42,7 +46,7 @@ def _athlete() -> tuple[int, str]:
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(_STATIC / "index.html")
+    return FileResponse(_STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 def require_auth(x_init_data: str = Header(default="")) -> dict:
@@ -82,6 +86,83 @@ async def api_set_lang(body: LangIn, user: dict = Depends(require_auth)):
     return {"lang": body.lang}
 
 
+def _recent_days(con, tg_id: int, lookback: int = 14) -> list[dict]:
+    """Последние дни daily для «Тюнинга часов» (колонки + extra)."""
+    rows = con.execute(
+        'SELECT "readiness","hrv","stress_avg","sleep_h","extra" FROM daily '
+        'WHERE "tg_id"=? ORDER BY "day" DESC LIMIT ?', (tg_id, lookback)).fetchall()
+    out = []
+    for r in rows:
+        try:
+            ex = json.loads(r["extra"]) if r["extra"] else {}
+        except ValueError:
+            ex = {}
+        out.append({"readiness": r["readiness"], "hrv": r["hrv"],
+                    "stress_avg": r["stress_avg"], "sleep_h": r["sleep_h"],
+                    "extra": ex})
+    return out
+
+
+def _require_pro(user: dict) -> None:
+    if not (is_admin(user["id"]) or is_pro(user["id"])):
+        raise HTTPException(status_code=403, detail="нужен Pro")
+
+
+def _user_targets(con, tg_id: int, upto_day: str | None = None):
+    """Профиль+цель → (goal, вес на дату, нормы КБЖУ | None). Единая точка расчёта."""
+    u = botdb.get_user(con, tg_id)
+    goal = botdb.user_goal(con, tg_id)
+    weight = botdb.latest_weight(con, tg_id, upto_day)
+    tgt = ng.targets(u["sex"] if u else "m", u["age"] if u else None,
+                     u["height_cm"] if u else None,
+                     weight or (u["weight_kg"] if u else None), goal)
+    return goal, weight, tgt
+
+
+@app.get("/api/nutrition")
+async def api_nutrition(user: dict = Depends(require_auth),
+                        day: str | None = Query(default=None),
+                        as_user: int | None = Query(default=None, alias="as")):
+    _require_pro(user)
+    eff = resolve_effective_user(user["id"], as_user)
+    lang = _req_lang(user)
+    d = day or date.today().isoformat()
+    con = botdb.connect(_db())
+    try:
+        meals = botdb.meals_for_day(con, eff, d)
+        water = botdb.water_for_day(con, eff, d)
+        goal, weight, tgt = _user_targets(con, eff, d)
+        burned = ng.burned(con, eff, d)
+        water_target = ng.water_target_l(ng.sweat_ml(con, eff, d))
+    finally:
+        con.close()
+    totals = _nutr.day_totals(meals)
+    ppk = round(totals["protein_g"] / weight, 2) if weight and totals["protein_g"] else None
+    return {"day": d, "meals": meals, "totals": totals, "water_l": water,
+            "weight_kg": weight, "protein_per_kg": ppk,
+            "advice": _nutr.day_advice(totals, water, weight, lang),
+            "targets": tgt, "burned": burned, "water_target_l": water_target,
+            "goal": goal, "day_verdict": _nutr.day_verdict(meals),
+            "pro": is_pro(user["id"])}
+
+
+@app.get("/api/nutrition/days")
+async def api_nutrition_days(user: dict = Depends(require_auth),
+                             as_user: int | None = Query(default=None, alias="as")):
+    _require_pro(user)
+    eff = resolve_effective_user(user["id"], as_user)
+    con = botdb.connect(_db())
+    try:
+        days = botdb.nutrition_days(con, eff, days=30)
+        qualities = botdb.meal_qualities_by_day(con, eff)
+        goal, weight, tgt = _user_targets(con, eff)
+    finally:
+        con.close()
+    for row in days:
+        row["verdict"] = _nutr.day_verdict(qualities.get(row["day"]))
+    return {"days": days, "weight_kg": weight, "targets": tgt, "goal": goal}
+
+
 @app.get("/api/summary")
 async def api_summary(user: dict = Depends(require_auth), as_user: int | None = Query(default=None, alias="as")):
     eff = resolve_effective_user(user["id"], as_user)
@@ -96,6 +177,21 @@ async def api_summary(user: dict = Depends(require_auth), as_user: int | None = 
         data["lang"] = lang
         ai = botdb.next_advice_get(con, eff, lang)
         dv = botdb.data_version(con)
+        data["watch_tuning"] = _watch.evaluate(
+            botdb.load_devices(con, eff), _recent_days(con, eff))
+        _, w7, tgt7 = _user_targets(con, eff)
+        days7 = botdb.nutrition_days(con, eff, days=7)
+        ns = _nutr.period_summary(days7, botdb.water_days(con, eff), w7, targets=tgt7)
+        ns["micro_flags"] = _nutr.micro_week_flags(days7)
+        qual_by_day = botdb.meal_qualities_by_day(con, eff)
+        verdicts = []
+        for vd in sorted(qual_by_day)[-7:]:
+            v = _nutr.day_verdict(qual_by_day[vd])
+            if v is not None:
+                verdicts.append({"day": vd, "v": v})
+        ns["verdicts"] = verdicts
+        data["nutrition7"] = ({**ns, "advice": _nutr.period_advice(ns, lang)}
+                              if ns.get("days") else None)
     finally:
         con.close()
     if ai and ai.get("text"):
@@ -154,9 +250,11 @@ async def api_competitions(user: dict = Depends(require_auth), as_user: int | No
     eff = resolve_effective_user(user["id"], as_user)
     con = botdb.connect(_db())
     try:
-        return total_report(con, eff, lang=_req_lang(user))
+        data = total_report(con, eff, lang=_req_lang(user))
     finally:
         con.close()
+    data["pro"] = is_pro(user["id"])
+    return data
 
 
 @app.get("/api/competition/{event_id}")
@@ -202,17 +300,146 @@ async def api_leaderboard(user: dict = Depends(require_auth),
         con.close()
 
 
-def _llm_payload(con, kind: str, ref: str, tg_id: int):
-    if kind not in ("workout", "summary"):
+def _nutrition_day_block(con, tg_id: int, day: str) -> dict | None:
+    meals = botdb.meals_for_day(con, tg_id, day)
+    if not meals:
         return None
+    t = _nutr.day_totals(meals)
+    t["water_l"] = botdb.water_for_day(con, tg_id, day)
+    t["meals"] = len(meals)
+    return t
+
+
+def _llm_payload(con, kind: str, ref: str, tg_id: int):
+    if kind not in ("workout", "summary", "competitions", "nutr_day", "nutr_week"):
+        return None
+    if kind in ("nutr_day", "nutr_week"):
+        return _nutr_llm_payload(con, tg_id, ref, week=(kind == "nutr_week"))
+    if kind == "competitions":
+        tr = total_report(con, tg_id)
+        if not tr or not tr.get("starts"):
+            return None
+        # radars — данные графика, narrative — наш же шаблонный текст: ИИ не нужны
+        return {k: v for k, v in tr.items() if k not in ("radars", "narrative")}
     hr_max, sex = botdb.profile_hr_sex(con, tg_id)
     if kind == "workout":
         rep = workout_report(_db(), "sqlite", hr_max, sex, ref, tg_id=tg_id)
         if rep is None:
             return None
-        return llm_coach.workout_payload(rep)
+        payload = llm_coach.workout_payload(rep)
+        payload["bodyweight_kg"] = botdb.latest_weight(con, tg_id, ref)
+        payload["nutrition"] = _nutrition_day_block(con, tg_id, ref)
+        return payload
     data = summary_data(_db(), "sqlite", hr_max, sex, date.today(), tg_id=tg_id)
-    return llm_coach.summary_payload(data)
+    payload = llm_coach.summary_payload(data)
+    payload["weight_kg"] = botdb.latest_weight(con, tg_id)
+    ns = _nutr.period_summary(botdb.nutrition_days(con, tg_id, days=7),
+                              botdb.water_days(con, tg_id), payload["weight_kg"])
+    payload["nutrition7"] = ns if ns.get("days") else None
+    return payload
+
+
+def _nutr_llm_payload(con, tg_id: int, ref: str, week: bool):
+    """Payload ИИ-разбора питания: день (ref) или неделя до ref включительно.
+    Три батч-запроса на весь диапазон (meals/water/activities), без per-day циклов."""
+    goal, weight, tgt = _user_targets(con, tg_id, ref)
+    try:
+        end = date.fromisoformat(ref)
+    except ValueError:
+        return None
+    first = (end - timedelta(days=6 if week else 0)).isoformat()
+    meals_by_day: dict[str, list[dict]] = {}
+    for r in con.execute(
+            'SELECT "day","foods","kcal","protein_g","fat_g","carb_g","quality" '
+            'FROM meals WHERE "tg_id"=? AND "day">=? AND "day"<=? ORDER BY "ts"',
+            (tg_id, first, ref)):
+        m = dict(r)
+        try:
+            m["foods"] = json.loads(m["foods"]) if m["foods"] else []
+        except ValueError:
+            m["foods"] = []
+        meals_by_day.setdefault(m["day"], []).append(m)
+    if not meals_by_day:
+        return None
+    water = {r["day"]: r["liters"] for r in con.execute(
+        'SELECT "day","liters" FROM water_log WHERE "tg_id"=? AND "day">=? AND "day"<=?',
+        (tg_id, first, ref))}
+    burned_by_day: dict[str, int] = {}
+    sweat_by_day: dict[str, int] = {}
+    workouts = []
+    for r in con.execute(
+            'SELECT "day","sport","calories","extra" FROM activities '
+            'WHERE "tg_id"=? AND "day">=? AND "day"<=?', (tg_id, first, ref)):
+        workouts.append({"day": r["day"], "sport": r["sport"], "calories": r["calories"]})
+        burned_by_day[r["day"]] = burned_by_day.get(r["day"], 0) + int(r["calories"] or 0)
+        try:
+            sweat_by_day[r["day"]] = sweat_by_day.get(r["day"], 0) + int(
+                (json.loads(r["extra"] or "{}")).get("sweat_loss_ml") or 0)
+        except (ValueError, TypeError):
+            pass
+    day_blocks = [
+        {"day": d, "totals": _nutr.day_totals(meals_by_day[d]),
+         "verdict": _nutr.day_verdict(meals_by_day[d]),
+         "water_l": round(water.get(d) or 0, 2),
+         "water_target_l": ng.water_target_l(sweat_by_day.get(d, 0)),
+         "burned": burned_by_day.get(d, 0)}
+        for d in sorted(meals_by_day)]
+    return {"period": "week" if week else "day", "goal": goal,
+            "city": botdb.user_city(con, tg_id), "weight_kg": weight,
+            "targets": tgt, "days": day_blocks, "workouts": workouts,
+            "logged_days": len(day_blocks)}
+
+
+def _finalize_llm(con, tg_id: int, kind: str, ref: str, text: str, engine: str,
+                  lang: str) -> str:
+    """Побочные артефакты разбора (совет в Сводке, компакт-блоки тренировки).
+    Возвращает текст для показа (у workout срезаются служебные блоки)."""
+    if kind == "summary":
+        line = llm_coach.parse_advice_line(text, lang)
+        if line:
+            botdb.next_advice_put(con, tg_id, engine, line, lang=lang)
+    elif kind == "workout":
+        blocks = llm_coach.parse_workout_blocks(text, lang)
+        if blocks:
+            botdb.wk_narrative_put(con, tg_id, ref, engine, blocks, lang=lang)
+            text = llm_coach.strip_workout_blocks(text, lang)
+    return text
+
+
+def _refresh_other_llm(tg_id: int, done_kind: str, lang: str) -> None:
+    """Фон после кнопки «Разобрать ИИ»: обновить разборы ОСТАЛЬНЫХ сущностей
+    (сводка + последняя тренировка + соревнования, если заполнены). Свежий кэш
+    не перегенерируется; квота повторно не списывается; ошибки — молча дальше."""
+    con = botdb.connect(_db())
+    try:
+        targets = []
+        if done_kind != "summary":
+            targets.append(("summary", "30d"))
+        if done_kind != "workout":
+            row = con.execute('SELECT MAX("day") d FROM activities WHERE "tg_id"=?',
+                              (tg_id,)).fetchone()
+            if row and row["d"]:
+                targets.append(("workout", row["d"]))
+        if done_kind != "competitions":
+            targets.append(("competitions", "total"))
+        astro = botdb.user_astro(con, tg_id)
+        for k, r in targets:
+            try:
+                payload = _llm_payload(con, k, r, tg_id)
+                if payload is None:
+                    continue
+                h = llm_coach.payload_hash(payload, lang, astro)
+                if botdb.llm_cache_get(con, tg_id, k, r, h, lang):
+                    continue                       # данные не менялись — кэш свежий
+                text, engine = llm_coach.coach(k, payload, lang, astro)
+                if not text:
+                    continue
+                text = _finalize_llm(con, tg_id, k, r, text, engine, lang)
+                botdb.llm_cache_put(con, tg_id, k, r, h, text, engine, lang=lang)
+            except Exception as e:
+                print(f"[llm] refresh {k} для {tg_id}: {type(e).__name__}", flush=True)
+    finally:
+        con.close()
 
 
 @app.get("/api/llm/{kind}/{ref}")
@@ -250,7 +477,8 @@ async def api_claude_get(day: str, user: dict = Depends(require_auth), as_user: 
 
 
 @app.post("/api/llm/{kind}/{ref}")
-async def api_llm_post(kind: str, ref: str, refresh: int = Query(0), user: dict = Depends(require_auth)):
+def api_llm_post(kind: str, ref: str, background: BackgroundTasks,   # sync: Claude думает до минуты, не держим event loop
+                       refresh: int = Query(0), user: dict = Depends(require_auth)):
     if not is_pro(user["id"]):
         raise HTTPException(status_code=403, detail="нужен Pro")
     con = botdb.connect(_db())
@@ -265,26 +493,41 @@ async def api_llm_post(kind: str, ref: str, refresh: int = Query(0), user: dict 
         if not refresh:
             cached = botdb.llm_cache_get(con, user["id"], kind, ref, h, lang)
             if cached:
-                return {"text": cached, "cached": True}
+                background.add_task(_refresh_other_llm, user["id"], kind, lang)
+                return {"text": cached["text"], "engine": cached["engine"], "cached": True}
         if not llm_quota_consume(user["id"], con):
             raise HTTPException(status_code=429, detail=f"Лимит ИИ на сегодня исчерпан ({LLM_DAILY_LIMIT}/день)")
-        text = (llm_coach.coach_workout(payload, lang, astro) if kind == "workout"
-                else llm_coach.coach_summary(payload, lang, astro))
-        if not text:
-            raise HTTPException(status_code=503, detail="ИИ недоступен")
-        if kind == "summary":
-            line = llm_coach.parse_advice_line(text, lang)
-            if line:
-                botdb.next_advice_put(con, user["id"], "gemini", line, lang=lang)
-        elif kind == "workout":
-            blocks = llm_coach.parse_workout_blocks(text, lang)
-            if blocks:
-                botdb.wk_narrative_put(con, user["id"], ref, "gemini", blocks, lang=lang)
-                text = llm_coach.strip_workout_blocks(text, lang)
-        botdb.llm_cache_put(con, user["id"], kind, ref, h, text, "gemini", lang=lang)
-        return {"text": text, "cached": False}
+        # refresh: чистим старый кэш, иначе поллинг фронта натыкается на прошлый
+        # разбор (генерация идёт секунды) и показывает его вместо свежего.
+        botdb.llm_cache_delete(con, user["id"], kind, ref)
+        # Клод пишет до 2-3 минут, а туннель режет запрос по таймауту ~100с —
+        # поэтому генерим В ФОНЕ, а фронт поллит GET, пока кэш не наполнится.
+        background.add_task(_generate_llm, user["id"], kind, ref, lang)
+        return {"pending": True}
     finally:
         con.close()
+
+
+def _generate_llm(tg_id: int, kind: str, ref: str, lang: str) -> None:
+    """Фоновая генерация нажатого разбора (Claude первым, Gemini запасным),
+    затем цепочкой — разборы остальных сущностей."""
+    con = botdb.connect(_db())
+    try:
+        payload = _llm_payload(con, kind, ref, tg_id)
+        if payload is None:
+            return
+        astro = botdb.user_astro(con, tg_id)
+        h = llm_coach.payload_hash(payload, lang, astro)
+        text, engine = llm_coach.coach(kind, payload, lang, astro)
+        if not text:
+            return
+        text = _finalize_llm(con, tg_id, kind, ref, text, engine, lang)
+        botdb.llm_cache_put(con, tg_id, kind, ref, h, text, engine, lang=lang)
+    except Exception as e:
+        print(f"[llm] generate {kind}/{ref} для {tg_id}: {type(e).__name__}", flush=True)
+    finally:
+        con.close()
+    _refresh_other_llm(tg_id, kind, lang)   # одна кнопка обновляет все разборы
 
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")

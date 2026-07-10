@@ -49,9 +49,9 @@ def test_render_one_user():
         {"tg_id": 22222222, "action": "garmin_sync", "n": 10},
         {"tg_id": 22222222, "action": "llm_review", "n": 2},
     ]
-    out = stats.render(counts, {22222222: "Игрок"}, "за 30 дней")
+    out = stats.render(counts, {22222222: "Петя"}, "за 30 дней")
     assert "📊 Статистика · за 30 дней" in out
-    assert "Игрок (22222222)" in out
+    assert "Петя (22222222)" in out
     assert "Тренировка 5" in out
     assert "Результат 3" in out
     assert "Синк Garmin 10" in out

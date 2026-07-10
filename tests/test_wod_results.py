@@ -25,8 +25,8 @@ def test_summarize_amrap_and_time():
         "  время (мм:сс): 8:36\n"
     )
     data, lines = summarize_filled(blocks, text)
-    assert data["amrap"]["total_rounds"] == 19
-    assert data["amrap"]["total_reps"] == 5
+    assert data["amrap"]["total_rounds"] == 19          # 5+4+4+3+3
+    assert data["amrap"]["total_reps"] == 5             # 3+0+0+2+0
     assert data["times_sec"] == [516]
     assert any(l.startswith("AMRAP") and "19" in l for l in lines)
     assert any(l.startswith("WOD") and "8:36" in l for l in lines)
@@ -55,9 +55,9 @@ def test_block_labeled_summary_wod_and_amrap():
     )
     data, lines = summarize_filled(blocks, text)
     joined = "\n".join(lines)
-    assert any(l.startswith("WOD") and "8:36" in l for l in lines)
-    assert any(l.startswith("AMRAP") and "10" in l for l in lines)
-    assert not any(l.startswith("AMRAP") and "8:36" in l for l in lines)
+    assert any(l.startswith("WOD") and "8:36" in l for l in lines)       # время помечено как WOD
+    assert any(l.startswith("AMRAP") and "10" in l for l in lines)        # круги помечены как AMRAP
+    assert not any(l.startswith("AMRAP") and "8:36" in l for l in lines)  # время НЕ приписано AMRAP
 
 
 def test_summarize_benchmark_and_score():

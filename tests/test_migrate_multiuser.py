@@ -23,7 +23,7 @@ def test_migrate_backfills_owner(tmp_path):
 def test_migrate_idempotent(tmp_path):
     p = str(tmp_path / "t.db"); _old_schema(p)
     migrate(p, owner_id=botdb.OWNER_ID)
-    migrate(p, owner_id=botdb.OWNER_ID)
+    migrate(p, owner_id=botdb.OWNER_ID)  # второй прогон не падает
     con = sqlite3.connect(p)
     assert con.execute('SELECT count(*) FROM daily').fetchone()[0] == 1
     con.close()
