@@ -296,3 +296,13 @@ def claude_complete(prompt: str, *, timeout: float = 150.0) -> str | None:
         if text:
             return text
     return _anthropic_complete(prompt, timeout=timeout)
+
+
+def deep_complete(prompt: str, *, timeout: float = 300.0,
+                  max_output_tokens: int = 2600) -> str | None:
+    """Глубокий разбор движко-агностично: Claude (если включён и доступен) ->
+    Gemini. claude_complete под гейтом сам вернёт None при выключенном Claude."""
+    text = claude_complete(prompt, timeout=timeout)
+    if text:
+        return text
+    return complete("", prompt, max_output_tokens=max_output_tokens)

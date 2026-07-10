@@ -89,3 +89,18 @@ def test_claude_complete_prefers_cli_over_api(monkeypatch):
     monkeypatch.setattr(llm, "_anthropic_complete",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("API не должен вызываться")))
     assert llm.claude_complete("вопрос") == "CLI-ответ"
+
+
+def test_deep_complete_claude_when_enabled(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: "глубокий Claude")
+    monkeypatch.setattr(llm, "complete",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("Gemini не нужен")))
+    assert llm.deep_complete("prompt") == "глубокий Claude"
+
+
+def test_deep_complete_gemini_when_disabled(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    # claude_complete под гейтом сам вернёт None
+    monkeypatch.setattr(llm, "complete", lambda system, user, **k: "глубокий Gemini")
+    assert llm.deep_complete("prompt") == "глубокий Gemini"
