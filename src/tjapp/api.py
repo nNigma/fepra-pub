@@ -364,19 +364,34 @@ def _nutr_llm_payload(con, tg_id: int, ref: str, week: bool):
     water = {r["day"]: r["liters"] for r in con.execute(
         'SELECT "day","liters" FROM water_log WHERE "tg_id"=? AND "day">=? AND "day"<=?',
         (tg_id, first, ref))}
+    # ручная WOD-запись и garmin-биометрия одной сессии (день+спорт, разный source)
+    # — это ОДНА тренировка; сливаем, иначе в промпт уходят «две тренировки».
+    sessions: list[dict] = []
+    for r in con.execute(
+            'SELECT "day","sport","calories","source","extra" FROM activities '
+            'WHERE "tg_id"=? AND "day">=? AND "day"<=?', (tg_id, first, ref)):
+        cal = int(r["calories"] or 0)
+        try:
+            sweat = int((json.loads(r["extra"] or "{}")).get("sweat_loss_ml") or 0)
+        except (ValueError, TypeError):
+            sweat = 0
+        src = r["source"]
+        same = next((s for s in sessions if s["day"] == r["day"]
+                     and s["sport"] == r["sport"] and src not in s["sources"]), None)
+        if same is not None:
+            same["calories"] = max(same["calories"], cal)
+            same["sweat"] = max(same["sweat"], sweat)
+            same["sources"].add(src)
+        else:
+            sessions.append({"day": r["day"], "sport": r["sport"], "calories": cal,
+                             "sweat": sweat, "sources": {src}})
+    workouts = [{"day": s["day"], "sport": s["sport"], "calories": s["calories"] or None}
+                for s in sessions]
     burned_by_day: dict[str, int] = {}
     sweat_by_day: dict[str, int] = {}
-    workouts = []
-    for r in con.execute(
-            'SELECT "day","sport","calories","extra" FROM activities '
-            'WHERE "tg_id"=? AND "day">=? AND "day"<=?', (tg_id, first, ref)):
-        workouts.append({"day": r["day"], "sport": r["sport"], "calories": r["calories"]})
-        burned_by_day[r["day"]] = burned_by_day.get(r["day"], 0) + int(r["calories"] or 0)
-        try:
-            sweat_by_day[r["day"]] = sweat_by_day.get(r["day"], 0) + int(
-                (json.loads(r["extra"] or "{}")).get("sweat_loss_ml") or 0)
-        except (ValueError, TypeError):
-            pass
+    for s in sessions:
+        burned_by_day[s["day"]] = burned_by_day.get(s["day"], 0) + s["calories"]
+        sweat_by_day[s["day"]] = sweat_by_day.get(s["day"], 0) + s["sweat"]
     day_blocks = [
         {"day": d, "totals": _nutr.day_totals(meals_by_day[d]),
          "verdict": _nutr.day_verdict(meals_by_day[d]),

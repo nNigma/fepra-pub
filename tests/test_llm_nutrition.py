@@ -77,6 +77,25 @@ def test_nutr_llm_payload_day_no_meals(tmp_path):
     con.close()
 
 
+def test_nutr_payload_merges_garmin_manual_same_session(tmp_path):
+    con = _setup(tmp_path)
+    # одна кроссфит-сессия: часы (garmin, 998 ккал) + ручная доска (manual, без калорий)
+    con.execute('INSERT INTO activities ("tg_id","day","sport","activity_id","source","calories","extra") '
+                'VALUES (?,?,?,?,?,?,?)',
+                (1, "2026-07-08", "crossfit", "g1", "garmin", 998, json.dumps({})))
+    con.execute('INSERT INTO activities ("tg_id","day","sport","activity_id","source","calories","extra") '
+                'VALUES (?,?,?,?,?,?,?)',
+                (1, "2026-07-08", "crossfit", "manual-1-2026-07-08-crossfit", "manual", None, json.dumps({})))
+    con.commit()
+    payload = apimod._nutr_llm_payload(con, 1, "2026-07-08", week=False)
+    cf = [w for w in payload["workouts"] if w["sport"] == "crossfit" and w["day"] == "2026-07-08"]
+    assert len(cf) == 1, f"ожидали 1 кроссфит-сессию, got {cf}"
+    assert cf[0]["calories"] == 998            # калории часов, не null от ручной
+    day = payload["days"][0]
+    assert day["burned"] == 1298               # 998 кроссфит + 300 run, без двойного счёта
+    con.close()
+
+
 def test_sys_summary_has_all_sections():
     ru = llm_coach._SYS_BY_KIND["summary"]("ru", False)
     for h in ("Куда идёт форма", "Оценка месяца", "Риски и куда дальше", "Питание"):
