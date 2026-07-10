@@ -246,8 +246,6 @@ async def board_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     lang = botdb.user_lang(con, uid)
     con.close()
     engine = "claude" if q.data == "beng:slow" else "gemini"
-    await q.edit_message_text(i18n.t(
-        "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
     return await _parse_board_photo(q.message, context, lang, engine, uid)
 
 
