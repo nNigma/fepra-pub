@@ -82,6 +82,7 @@ def test_verify_benchmark_blocks_untouched(monkeypatch):
 
 
 def test_claude_complete_envelope(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
     monkeypatch.setattr(llm, "_claude_bin", lambda: "claude")
 
     class _Proc:

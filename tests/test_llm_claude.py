@@ -22,6 +22,7 @@ def _envelope(result: str, is_error: bool = False) -> str:
 
 
 def test_claude_vision_success(monkeypatch, tmp_path):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
     captured = {}
 
     def _run(cmd, cwd=None, capture_output=None, text=None, timeout=None):
