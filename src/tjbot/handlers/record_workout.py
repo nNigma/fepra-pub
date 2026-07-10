@@ -143,6 +143,13 @@ def _board_failed_kb(lang: str) -> InlineKeyboardMarkup:
     ]])
 
 
+def _offer_engine_choice() -> bool:
+    """Показывать ли выбор движка доски: только когда Claude-vision доступен
+    (включён и есть CLI). Иначе фото идёт сразу в Gemini."""
+    from .. import vision
+    return vision.has_claude()
+
+
 def _result_prompt(lang: str) -> str:
     return i18n.t("record.ask_result_strength", lang)
 
@@ -174,8 +181,10 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 i18n.t("record.board_not_recognized_head", lang)
                 + i18n.t("record.ask_board_text_fallback", lang))
             return BOARD
-        await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
-        return BOARD_ENGINE
+        if _offer_engine_choice():
+            await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+            return BOARD_ENGINE
+        return await _parse_board_photo(msg, context, lang, "gemini", uid)
     if msg.text and msg.text.strip().lower() != "пропустить":
         text = msg.text.strip()
         if editing:
@@ -191,26 +200,21 @@ async def board(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return RESULT
 
 
-async def board_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Выбор движка распознавания доски: быстрый Gemini или медленный Claude."""
-    from .. import vision
-    q = update.callback_query
-    await q.answer()
-    uid = update.effective_user.id
-    con = botdb.connect(context.bot_data["db_path"])
-    lang = botdb.user_lang(con, uid)
-    con.close()
-    engine = "claude" if q.data == "beng:slow" else "gemini"
+async def _parse_board_photo(message, context: ContextTypes.DEFAULT_TYPE,
+                             lang: str, engine: str, uid: int) -> int:
+    """Скачать фото доски и распознать выбранным движком. Общий код для выбора
+    движка (Claude вкл) и прямого Gemini-пути (Claude выкл)."""
     file_id = context.user_data.get("board_photo")
     if not file_id:
-        await q.edit_message_text(_result_prompt(lang))
+        await message.reply_text(_result_prompt(lang))
         return RESULT
     if not access.llm_quota_consume(uid):
         context.user_data["board_text"] = "[фото доски — не распознано]"
-        await q.edit_message_text(_llm_limit_msg(lang) + i18n.t("record.ask_board_text_fallback", lang))
+        await message.reply_text(_llm_limit_msg(lang) + i18n.t("record.ask_board_text_fallback", lang))
         return BOARD
-    await q.edit_message_text(i18n.t(
+    await message.reply_text(i18n.t(
         "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
+    from .. import vision
     draft = None
     try:
         f = await context.bot.get_file(file_id)
@@ -223,14 +227,28 @@ async def board_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if draft.get("format"):
             context.user_data["wod_format"] = draft["format"]
         if draft.get("engine_used") and draft["engine_used"] != engine:
-            await q.message.reply_text(i18n.t("record.board_engine_swapped", lang))
-        return await _ask_board_confirm(q.message, context, lang)
+            await message.reply_text(i18n.t("record.board_engine_swapped", lang))
+        return await _ask_board_confirm(message, context, lang)
     context.user_data["board_text"] = "[фото доски — не распознано]"
-    await q.message.reply_text(
+    await message.reply_text(
         i18n.t("record.board_not_recognized_head", lang)
         + i18n.t("record.ask_board_text_fallback", lang),
         reply_markup=_board_failed_kb(lang))
     return BOARD
+
+
+async def board_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Выбор движка распознавания доски: быстрый Gemini или медленный Claude."""
+    q = update.callback_query
+    await q.answer()
+    uid = update.effective_user.id
+    con = botdb.connect(context.bot_data["db_path"])
+    lang = botdb.user_lang(con, uid)
+    con.close()
+    engine = "claude" if q.data == "beng:slow" else "gemini"
+    await q.edit_message_text(i18n.t(
+        "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
+    return await _parse_board_photo(q.message, context, lang, engine, uid)
 
 
 async def board_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -245,8 +263,10 @@ async def board_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if not context.user_data.get("board_photo"):
         await q.edit_message_text(_result_prompt(lang))
         return RESULT
-    await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
-    return BOARD_ENGINE
+    if _offer_engine_choice():
+        await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+        return BOARD_ENGINE
+    return await _parse_board_photo(q.message, context, lang, "gemini", uid)
 
 
 async def board_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
