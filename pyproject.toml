@@ -13,7 +13,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-bot = ["python-telegram-bot>=21", "fastapi", "uvicorn[standard]", "telethon", "anthropic", "httpx"]
+bot = ["python-telegram-bot>=21", "fastapi", "uvicorn[standard]", "telethon", "httpx"]
+claude = ["anthropic>=0.40"]
 dev = ["pytest"]
 
 [project.scripts]
