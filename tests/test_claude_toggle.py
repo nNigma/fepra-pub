@@ -43,3 +43,32 @@ def test_claude_enabled_missing_config_is_false(monkeypatch):
 
     monkeypatch.setattr(cfgmod, "load_config", _raise)
     assert cfgmod.claude_enabled() is False
+
+
+from tj import llm
+
+
+def test_claude_complete_gated_off(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    called = {"bin": False}
+    monkeypatch.setattr(llm, "_claude_bin", lambda: (called.__setitem__("bin", True) or "/x/claude"))
+    assert llm.claude_complete("привет") is None
+    assert called["bin"] is False  # до бинарника даже не дошли
+
+
+def test_claude_vision_gated_off(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    monkeypatch.setattr(llm, "_claude_bin", lambda: "/x/claude")
+    assert llm.claude_vision(b"\xff\xd8", "prompt") is None
+
+
+def test_has_claude_vision_gated_off(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    monkeypatch.setattr(llm, "_claude_bin", lambda: "/x/claude")
+    assert llm.has_claude_vision() is False
+
+
+def test_has_claude_vision_on_with_bin(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setattr(llm, "_claude_bin", lambda: "/x/claude")
+    assert llm.has_claude_vision() is True

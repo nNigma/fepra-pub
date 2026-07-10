@@ -177,7 +177,8 @@ def _claude_bin() -> str | None:
 
 
 def has_claude_vision() -> bool:
-    return bool(_claude_bin())
+    from tj.config import claude_enabled
+    return claude_enabled() and bool(_claude_bin())
 
 
 def _claude_lock_path() -> str:
@@ -235,6 +236,9 @@ def claude_vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/j
     cwd = временная папка с одним фото: CLI не видит ничего лишнего и не
     подхватывает CLAUDE.md. Любой сбой (нет бинаря, протух login, таймаут,
     битый конверт) -> None, роутер уйдёт в Gemini."""
+    from tj.config import claude_enabled
+    if not claude_enabled():
+        return None
     if not _claude_bin():
         return None
     ext = _CLAUDE_EXT.get(media_type, ".jpg")
@@ -249,6 +253,9 @@ def claude_vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/j
 def claude_complete(prompt: str, *, timeout: float = 150.0) -> str | None:
     """Текстовая задача через `claude -p` (без фото). cwd = пустая временная
     папка (изоляция от CLAUDE.md и файлов). Сбой -> None, звонящий фолбэчит."""
+    from tj.config import claude_enabled
+    if not claude_enabled():
+        return None
     if not _claude_bin():
         return None
     with _claude_guard():
