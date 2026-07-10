@@ -53,12 +53,12 @@ async function llmGo(kind, ref, refresh){
   }
   box.innerHTML=H+`<div class="mut">${T('llm.pending_long')}</div>`;
 }
-function llmBlock(kind, ref, pro, cached){
+function llmBlock(kind, ref, pro, cached, stale){
   if(!pro) return `<div class="mut" style="margin:10px 2px;font-size:12px">${T('llm.pro_only')}</div>`;
   const head=`<div class="llmhead">${T('llm.head')}</div>`;
   const ctext=cached&&(cached.text||cached);           // объект {text,engine} или строка (старый кэш)
   const inner = ctext
-    ? head+llmSig(cached&&cached.engine)+reviewInner(ctext,'llmtext')
+    ? head+(stale?`<span class="review-stale">🟡 ${T('llm.stale')}</span>`:'')+llmSig(cached&&cached.engine)+reviewInner(ctext,'llmtext')
       +`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',1)">${T('llm.refresh')}</button>`
     : head+`<button class="llmbtn" onclick="llmGo('${kind}','${ref}',0)">${T('llm.run')}</button>`;
   return `<div class="llmwrap" id="llm_${kind}">${inner}</div>`;
@@ -67,7 +67,7 @@ function loadLlm(kind, ref, pro){
   fetch(withAs('/api/llm/'+kind+'/'+encodeURIComponent(ref)), {headers:{'X-Init-Data':INIT}})
     .then(r=>r.ok?r.json():{available:false,cached:null})
     .then(d=>{ const host=document.getElementById('llmhost_'+kind);
-      if(host) host.innerHTML=llmBlock(kind, ref, pro, d.cached); });
+      if(host) host.innerHTML=llmBlock(kind, ref, pro, d.cached, d.stale); });
 }
 
 function mdEsc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}

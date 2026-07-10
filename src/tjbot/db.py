@@ -1001,6 +1001,15 @@ def llm_cache_get(con, tg_id, kind, ref_key, data_hash, lang="ru") -> dict | Non
     return {"text": row["content"], "engine": row["model"]} if row else None
 
 
+def llm_cache_get_latest(con, tg_id, kind, ref_key, lang="ru") -> dict | None:
+    """Разбор позиции игнорируя data_hash (строка одна на kind+ref+lang).
+    -> {"text","engine","data_hash"} | None. Для персистентного показа."""
+    row = con.execute(
+        'SELECT content, model, data_hash FROM llm_cache WHERE tg_id=? AND kind=? AND ref_key=? AND lang=?',
+        (tg_id, kind, ref_key, lang)).fetchone()
+    return {"text": row["content"], "engine": row["model"], "data_hash": row["data_hash"]} if row else None
+
+
 def llm_cache_delete(con, tg_id, kind, ref_key) -> None:
     """Стереть Gemini-кэш разбора (все языки) — Claude-разбор перекрывает Gemini."""
     con.execute('DELETE FROM llm_cache WHERE tg_id=? AND kind=? AND ref_key=?',

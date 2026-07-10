@@ -35,6 +35,7 @@ window.STR = {
     "llm.refresh": "Обновить",
     "llm.pro_only": "🤖 Разбор ИИ — в Pro",
     "llm.run": "🤖 Разобрать ИИ",
+    "llm.stale": "данные обновились",
 
     "claude.head": "🎩 Разбор от Месье Клод",
     "astro.title": "Астро-разбор от Месье Клода",
@@ -369,6 +370,7 @@ window.STR = {
     "llm.refresh": "Refresh",
     "llm.pro_only": "🤖 AI breakdown — Pro only",
     "llm.run": "🤖 Run AI breakdown",
+    "llm.stale": "data changed",
 
     "claude.head": "🎩 Monsieur Claude's breakdown",
     "astro.title": "Astro reading by Monsieur Claude",

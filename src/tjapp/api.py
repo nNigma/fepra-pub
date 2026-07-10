@@ -406,38 +406,44 @@ def _finalize_llm(con, tg_id: int, kind: str, ref: str, text: str, engine: str,
     return text
 
 
-def _refresh_other_llm(tg_id: int, done_kind: str, lang: str) -> None:
-    """Фон после кнопки «Разобрать ИИ»: обновить разборы ОСТАЛЬНЫХ сущностей
-    (сводка + последняя тренировка + соревнования, если заполнены). Свежий кэш
-    не перегенерируется; квота повторно не списывается; ошибки — молча дальше."""
+def _sweep_unreviewed(tg_id: int, lang: str, skip_kind: str | None = None,
+                      skip_ref: str | None = None) -> None:
+    """Фон после тапа «Разбор ИИ»: разобрать все НЕразобранные позиции за
+    последние 7 дней (summary, тренировки, дни питания, недельный свод,
+    соревнования). «Разобрано» = есть строка в кэше (даже устаревшая) → пропуск,
+    заново не гоним. Квоту НЕ тратит; ошибки — молча дальше."""
     con = botdb.connect(_db())
     try:
-        targets = []
-        if done_kind != "summary":
-            targets.append(("summary", "30d"))
-        if done_kind != "workout":
-            row = con.execute('SELECT MAX("day") d FROM activities WHERE "tg_id"=?',
-                              (tg_id,)).fetchone()
-            if row and row["d"]:
-                targets.append(("workout", row["d"]))
-        if done_kind != "competitions":
-            targets.append(("competitions", "total"))
+        since = (date.today() - timedelta(days=6)).isoformat()
+        targets: list[tuple[str, str]] = [("summary", "30d"), ("competitions", "total")]
+        for r in con.execute('SELECT DISTINCT "day" AS d FROM activities WHERE "tg_id"=? AND "day">=? ORDER BY "day"',
+                             (tg_id, since)):
+            targets.append(("workout", r["d"]))
+        nutr_days = [r["d"] for r in con.execute(
+            'SELECT DISTINCT "day" AS d FROM meals WHERE "tg_id"=? AND "day">=? ORDER BY "day"',
+            (tg_id, since))]
+        for d in nutr_days:
+            targets.append(("nutr_day", d))
+        if nutr_days:
+            targets.append(("nutr_week", nutr_days[-1]))
         astro = botdb.user_astro(con, tg_id)
-        for k, r in targets:
+        for k, ref in targets:
+            if k == skip_kind and ref == skip_ref:
+                continue
             try:
-                payload = _llm_payload(con, k, r, tg_id)
+                if botdb.llm_cache_get_latest(con, tg_id, k, ref, lang):
+                    continue
+                payload = _llm_payload(con, k, ref, tg_id)
                 if payload is None:
                     continue
                 h = llm_coach.payload_hash(payload, lang, astro)
-                if botdb.llm_cache_get(con, tg_id, k, r, h, lang):
-                    continue                       # данные не менялись — кэш свежий
                 text, engine = llm_coach.coach(k, payload, lang, astro)
                 if not text:
                     continue
-                text = _finalize_llm(con, tg_id, k, r, text, engine, lang)
-                botdb.llm_cache_put(con, tg_id, k, r, h, text, engine, lang=lang)
+                text = _finalize_llm(con, tg_id, k, ref, text, engine, lang)
+                botdb.llm_cache_put(con, tg_id, k, ref, h, text, engine, lang=lang)
             except Exception as e:
-                print(f"[llm] refresh {k} для {tg_id}: {type(e).__name__}", flush=True)
+                print(f"[llm] sweep {k}/{ref} для {tg_id}: {type(e).__name__}", flush=True)
     finally:
         con.close()
 
@@ -450,15 +456,19 @@ async def api_llm_get(kind: str, ref: str, user: dict = Depends(require_auth), a
     try:
         lang = _req_lang(user)
         cached = None
+        stale = False
         if available:
-            payload = _llm_payload(con, kind, ref, eff)
-            if payload is not None:
-                h = llm_coach.payload_hash(payload, lang, botdb.user_astro(con, eff))
-                cached = botdb.llm_cache_get(con, eff, kind, ref, h, lang)
+            stored = botdb.llm_cache_get_latest(con, eff, kind, ref, lang)
+            if stored:
+                cached = {"text": stored["text"], "engine": stored["engine"]}
+                payload = _llm_payload(con, kind, ref, eff)
+                if payload is not None:
+                    h = llm_coach.payload_hash(payload, lang, botdb.user_astro(con, eff))
+                    stale = (h != stored["data_hash"])
         remaining = llm_quota_remaining(user["id"], con)
     finally:
         con.close()
-    return {"available": available, "cached": cached, "remaining": remaining}
+    return {"available": available, "cached": cached, "stale": stale, "remaining": remaining}
 
 
 @app.get("/api/claude/{day}")
@@ -488,13 +498,11 @@ def api_llm_post(kind: str, ref: str, background: BackgroundTasks,   # sync: Cla
         if payload is None:
             raise HTTPException(status_code=404, detail="нет данных")
         botdb.log_action(con, user["id"], _stats.LLM_REVIEW)
-        astro = botdb.user_astro(con, user["id"])
-        h = llm_coach.payload_hash(payload, lang, astro)
         if not refresh:
-            cached = botdb.llm_cache_get(con, user["id"], kind, ref, h, lang)
-            if cached:
-                background.add_task(_refresh_other_llm, user["id"], kind, lang)
-                return {"text": cached["text"], "engine": cached["engine"], "cached": True}
+            stored = botdb.llm_cache_get_latest(con, user["id"], kind, ref, lang)
+            if stored:
+                background.add_task(_sweep_unreviewed, user["id"], lang, kind, ref)
+                return {"text": stored["text"], "engine": stored["engine"], "cached": True}
         if not llm_quota_consume(user["id"], con):
             raise HTTPException(status_code=429, detail=f"Лимит ИИ на сегодня исчерпан ({LLM_DAILY_LIMIT}/день)")
         # refresh: чистим старый кэш, иначе поллинг фронта натыкается на прошлый
@@ -527,7 +535,7 @@ def _generate_llm(tg_id: int, kind: str, ref: str, lang: str) -> None:
         print(f"[llm] generate {kind}/{ref} для {tg_id}: {type(e).__name__}", flush=True)
     finally:
         con.close()
-    _refresh_other_llm(tg_id, kind, lang)   # одна кнопка обновляет все разборы
+    _sweep_unreviewed(tg_id, lang, kind, ref)   # одна кнопка разбирает всё неразобранное
 
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
