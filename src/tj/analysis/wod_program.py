@@ -208,17 +208,22 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
     return many
 
 
+_NOTE_RE = re.compile(r"(?:\s*\(\s*\d+\s+раунд\w*[^)]*\))+\s*$")
+
+
 def annotate(text: str, aliases: dict | None = None) -> str:
     """Тот же разбор, но возвращает исходный текст с дописанными скобками
-    «(N раундов[ по M повторений])» у строк-нотаций. Для подтверждения доски."""
+    «(N раундов[ по M повторений])» у строк-нотаций. Идемпотентна: прежний
+    «(… раунд…)»-хвост срезается перед добавлением, повторный прогон не копит."""
     out = []
     for raw in (text or "").splitlines():
-        n = N.parse_notation(raw)
+        base = _NOTE_RE.sub("", raw.rstrip())
+        n = N.parse_notation(base)
         if n and n.get("scheme"):
             scheme = n["scheme"]
             word = _plural(len(scheme), "раунд", "раунда", "раундов")
             note = f" ({len(scheme)} {word}: {', '.join(str(x) for x in scheme)})"
-            out.append(raw.rstrip() + note)
+            out.append(base + note)
         elif n and n.get("rounds") and n["rounds"] >= 2:
             r = n["rounds"]
             rw = _plural(r, "раунд", "раунда", "раундов")
@@ -227,9 +232,9 @@ def annotate(text: str, aliases: dict | None = None) -> str:
                 note = f" ({r} {rw} по {n['reps']} {pw})"
             else:
                 note = f" ({r} {rw})"
-            out.append(raw.rstrip() + note)
+            out.append(base + note)
         else:
-            out.append(raw)
+            out.append(base)
     return "\n".join(out)
 
 

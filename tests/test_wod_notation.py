@@ -9,6 +9,15 @@ def test_emom_rounds_and_reps():
     assert n["rounds"] == 5 and n["reps"] == 5
 
 
+def test_emom_leading_rounds_no_interval():
+    # «EMOM 4х2х90%» без интервала в токене: 4 раунда, 2 повтора, 90% вес
+    n = parse_notation("EMOM 4х2х90%")
+    assert n["format"] == "emom_strength"
+    assert n["rounds"] == 4 and n["reps"] == 2
+    n2 = parse_notation("EMOM 4х2")
+    assert n2["rounds"] == 4 and n2["reps"] == 2
+
+
 def test_emom_plain_with_duration():
     assert parse_notation("EMOM x 5 мин x 40%")["rounds"] == 5
     assert parse_notation("EMOM 15 мин")["rounds"] == 15

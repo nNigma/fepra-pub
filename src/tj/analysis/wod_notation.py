@@ -38,6 +38,7 @@ _EMOM = re.compile(
     re.IGNORECASE,
 )
 _XNUM = re.compile(rf"{X}\s*(\d+)\s*(%?)")
+_LEAD_X = re.compile(rf"^\s*(\d+)\s*{X}")
 _AMRAP = re.compile(rf"{A}{M}{R}{A}{P}", re.IGNORECASE)
 _PAREN_NX = re.compile(rf"\(\s*(\d+)\s*{X}\s*(\d+)\s*{M}{I}{N}", re.IGNORECASE)
 _MIN = re.compile(rf"(\d+(?:[.,]\d+)?)\s*{M}{I}{N}", re.IGNORECASE)
@@ -101,8 +102,15 @@ def parse_notation(line: str) -> dict | None:
         if dur:
             out["rounds"] = max(1, round(_f(dur.group(1)) / interval)) if interval else 1
         else:
+            lead = _LEAD_X.match(tail)
             xs = _XNUM.findall(tail)
-            if xs:
+            if lead:
+                out["rounds"] = int(lead.group(1))
+                for num, pct in xs:
+                    if pct == "":
+                        out["reps"] = int(num)
+                        break
+            elif xs:
                 out["rounds"] = int(xs[0][0])
                 if len(xs) > 1 and xs[1][1] == "":
                     out["reps"] = int(xs[1][0])

@@ -111,3 +111,20 @@ def test_ladder_block_no_junk_movement():
 def test_annotate_rep_scheme():
     out = annotate("21-15-9")
     assert "(3 раунда: 21, 15, 9)" in out
+
+
+def test_annotate_emom_leading_rounds():
+    out = annotate("EMOM 4х2х90%")
+    assert out == "EMOM 4х2х90% (4 раунда по 2 повторения)"
+
+
+def test_annotate_idempotent():
+    once = annotate("2 сета:")
+    assert once == "2 сета: (2 раунда)"
+    assert annotate(once) == once
+    assert annotate(annotate(once)) == once
+
+
+def test_annotate_collapses_accumulated_notes():
+    dirty = "2 сета: (2 раунда) (2 раунда) (2 раунда)"
+    assert annotate(dirty) == "2 сета: (2 раунда)"
