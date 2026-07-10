@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tj", description="Training Journal")
     p.add_argument("--config", default="config.toml", help="путь к config.toml")
     p.add_argument("--env", default=None,
-                   help="путь к env-файлу с кредами (по умолч.: проектный .env или rr/.env)")
+                   help="путь к env-файлу с кредами (по умолч.: проектный .env)")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("seed", help="бэкфилл истории")

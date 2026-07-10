@@ -52,16 +52,14 @@ def load_dotenv(path: str | os.PathLike = ".env") -> dict[str, str]:
     return env
 
 
-# Источники кредов по убыванию приоритета: проектный .env -> общий секрет-стор rr.
+# Источник кредов: проектный .env.
 _ENV_CANDIDATES = (
     ".env",
-    "$RR_ROOT/.env",
-    "~/REDACTED/rr/.env",
 )
 
 
 def default_env_path() -> Path:
-    """Первый существующий env-файл: проектный .env, иначе общий rr/.env."""
+    """Первый существующий env-файл (проектный .env)."""
     for c in _ENV_CANDIDATES:
         p = _expand(c)
         if p.exists():

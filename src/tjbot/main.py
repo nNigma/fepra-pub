@@ -2,7 +2,7 @@
 
     PYTHONPATH=src .venv/bin/python -m tjbot.main
 
-Токен — TG_BOT_TOKEN (в rr/.env или окружении), берётся у @BotFather.
+Токен — TG_KUZ_BOT_TOKEN (в .env или окружении), берётся у @BotFather.
 Доступ приватный: незнакомцу бот отдаёт его ID, владелец вписывает в users_allow.json.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ def _token(env: dict) -> str:
         if tok:
             return tok
     raise SystemExit(
-        "Нет токена (TG_KUZ_BOT_TOKEN в rr/.env или окружении). Возьми у @BotFather."
+        "Нет токена (TG_KUZ_BOT_TOKEN в .env или окружении). Возьми у @BotFather."
     )
 
 

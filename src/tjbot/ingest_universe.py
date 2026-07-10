@@ -1,6 +1,6 @@
 """Universe-ingestion: Telethon-userbot слушает тред тренера, ловит фото доски.
 
-Креды: TG_API_ID / TG_API_HASH (rr/.env, с my.telegram.org). Сессия -
+Креды: TG_API_ID / TG_API_HASH (.env, с my.telegram.org). Сессия -
 файл tg_user.session. Тред: UNIVERSE_CHAT_ID + UNIVERSE_TOPIC_ID.
 
     PYTHONPATH=src .venv/bin/python -m tjbot.ingest_universe list           # список групп
@@ -31,7 +31,7 @@ def _creds():
     api_id = os.environ.get("TG_API_ID") or env.get("TG_API_ID")
     api_hash = os.environ.get("TG_API_HASH") or env.get("TG_API_HASH")
     if not api_id or not api_hash:
-        raise SystemExit("Нет TG_API_ID / TG_API_HASH в rr/.env (my.telegram.org).")
+        raise SystemExit("Нет TG_API_ID / TG_API_HASH в .env (my.telegram.org).")
     return int(api_id), api_hash, env
 
 
