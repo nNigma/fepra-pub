@@ -104,3 +104,32 @@ def test_deep_complete_gemini_when_disabled(monkeypatch):
     # claude_complete под гейтом сам вернёт None
     monkeypatch.setattr(llm, "complete", lambda system, user, **k: "глубокий Gemini")
     assert llm.deep_complete("prompt") == "глубокий Gemini"
+
+
+def test_engine_for_off_is_gemini(monkeypatch):
+    from tjbot import vision
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    assert vision.engine_for(123) == "gemini"
+
+
+def test_engine_for_on_is_claude(monkeypatch):
+    from tjbot import vision
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    assert vision.engine_for(123) == "claude"
+
+
+def test_review_ask_uses_deep_complete(monkeypatch):
+    from tjbot import claude_review
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    monkeypatch.setattr(llm, "deep_complete", lambda p, **k: '{"blocks": []}')
+    assert claude_review._ask("инструкция") == {"blocks": []}
+
+
+def test_run_all_no_hardstop_without_claude(monkeypatch):
+    from tjbot import claude_review
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
+    monkeypatch.setattr(llm, "has_claude_vision", lambda: False)
+    monkeypatch.setattr(claude_review.access, "load_pro", lambda: set())
+    # раньше возвращал [{"error": "claude CLI недоступен"}]; теперь — обычный (пустой) прогон
+    out = claude_review.run_all(db_path=":memory:")
+    assert out == [] or all("claude CLI недоступен" not in str(x) for x in out)

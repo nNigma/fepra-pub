@@ -80,9 +80,12 @@ def test_review_day_llm_fail(tmp_path, monkeypatch):
 
 
 def test_run_all_without_claude(monkeypatch):
+    """Claude выключен -> run_all не абортит, а идёт обычным прогоном (через Gemini)."""
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "0")
     monkeypatch.setattr(llm, "has_claude_vision", lambda: False)
-    out = cr.run_all()
-    assert out and "error" in out[0]
+    monkeypatch.setattr(cr.access, "load_pro", lambda: set())
+    out = cr.run_all(db_path=":memory:")
+    assert out == []
 
 
 def test_latest_weight(tmp_path):

@@ -115,7 +115,7 @@ def _valid_narrative(blocks) -> bool:
 
 
 def _ask(instr: str) -> dict | None:
-    raw = llm.claude_complete(_ROLE + "\n\n" + instr, timeout=_TIMEOUT)
+    raw = llm.deep_complete(_ROLE + "\n\n" + instr, timeout=_TIMEOUT)
     return _extract_obj(raw) if raw else None
 
 
@@ -205,9 +205,8 @@ def run_user(con, tg_id: int, db_path: str | None = None) -> dict:
 
 
 def run_all(db_path=None) -> list[dict]:
-    """Прогон по всем Pro. Claude недоступен — честный отказ без порчи данных."""
-    if not llm.has_claude_vision():
-        return [{"error": "claude CLI недоступен (bin не найден)"}]
+    """Прогон по всем Pro. Текст пишет Claude (если включён) или Gemini —
+    через deep_complete. Сбой шага — пропуск, не порча данных."""
     path = db_path or botdb.default_db_path()
     out = []
     con = botdb.connect(path)

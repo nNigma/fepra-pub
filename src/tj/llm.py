@@ -283,7 +283,8 @@ def _anthropic_complete(prompt: str, *, timeout: float = 150.0,
         return None
 
 
-def claude_complete(prompt: str, *, timeout: float = 150.0) -> str | None:
+def claude_complete(prompt: str, *, timeout: float = 150.0,
+                    max_tokens: int = 4096) -> str | None:
     """Текстовая задача: CLI по подписке -> API-ключ -> None. cwd CLI = пустая
     временная папка (изоляция от CLAUDE.md). Сбой всех -> None, звонящий фолбэчит."""
     from tj.config import claude_enabled
@@ -295,14 +296,14 @@ def claude_complete(prompt: str, *, timeout: float = 150.0) -> str | None:
                 text = _claude_run(prompt, td, timeout, "claude_complete")
         if text:
             return text
-    return _anthropic_complete(prompt, timeout=timeout)
+    return _anthropic_complete(prompt, timeout=timeout, max_tokens=max_tokens)
 
 
 def deep_complete(prompt: str, *, timeout: float = 300.0,
                   max_output_tokens: int = 2600) -> str | None:
     """Глубокий разбор движко-агностично: Claude (если включён и доступен) ->
     Gemini. claude_complete под гейтом сам вернёт None при выключенном Claude."""
-    text = claude_complete(prompt, timeout=timeout)
+    text = claude_complete(prompt, timeout=timeout, max_tokens=max_output_tokens)
     if text:
         return text
     return complete("", prompt, max_output_tokens=max_output_tokens)

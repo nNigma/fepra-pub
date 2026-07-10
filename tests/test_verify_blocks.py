@@ -3,9 +3,16 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from tj import llm
 from tjbot import db as botdb
 from tjbot import vision
+
+
+@pytest.fixture(autouse=True)
+def _enable_claude(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
 
 
 def _blocks():
@@ -82,7 +89,6 @@ def test_verify_benchmark_blocks_untouched(monkeypatch):
 
 
 def test_claude_complete_envelope(monkeypatch):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
     monkeypatch.setattr(llm, "_claude_bin", lambda: "claude")
 
     class _Proc:

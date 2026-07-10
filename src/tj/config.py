@@ -143,7 +143,7 @@ def claude_enabled() -> bool:
         try:
             cfg = load_config()
             _CLAUDE_ENABLED_CACHE = bool(cfg.get("llm", {}).get("use_claude", False))
-        except FileNotFoundError:
+        except (FileNotFoundError, tomllib.TOMLDecodeError):
             _CLAUDE_ENABLED_CACHE = False
     return _CLAUDE_ENABLED_CACHE
 

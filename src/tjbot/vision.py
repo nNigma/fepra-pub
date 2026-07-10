@@ -30,9 +30,10 @@ def has_claude() -> bool:
 
 
 def engine_for(tg_id: int) -> str:
-    """Все фото идут в Claude CLI по подписке; Gemini — фолбэк роутера
-    (и основной движок для досок, см. parse_board)."""
-    return "claude"
+    """Claude включён -> все фото в Claude CLI (Gemini — фолбэк роутера).
+    Выключен -> Gemini единственный движок."""
+    from tj.config import claude_enabled
+    return "claude" if claude_enabled() else "gemini"
 
 
 def _as_text(v) -> str:
