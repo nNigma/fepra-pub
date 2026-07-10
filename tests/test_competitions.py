@@ -12,9 +12,9 @@ def test_create_event_division_participant():
     con = _con()
     eid = botdb.create_event(con, name="Кубок Владимира", city="Владимир",
                              date_start="2026-04-12", date_end="2026-04-12",
-                             sport="crossfit", fmt="6 этапов", created_by=REDACTED)
+                             sport="crossfit", fmt="6 этапов", created_by=12345678)
     did = botdb.add_division(con, eid, name="PRO", field_size=22)
-    pid = botdb.add_participant(con, did, tg_id=REDACTED, athlete="Я")
+    pid = botdb.add_participant(con, did, tg_id=12345678, athlete="Я")
     assert eid > 0 and did > 0 and pid > 0
     ev = botdb.get_event(con, eid)
     assert ev["name"] == "Кубок Владимира"

@@ -26,10 +26,11 @@ def test_main_kb_admin_extras(monkeypatch):
     assert menu.BTN_ADMIN == "👑 Admin" and menu.BTN_BACK == "← Назад"
 
 
-def test_main_kb_sections():
+def test_main_kb_sections(monkeypatch):
     from tjbot.handlers.menu import (main_kb, BTN_ANALYTICS, BTN_RECORD,
                                      BTN_CLUB_SECTION, BTN_COMP_SECTION, BTN_ADMIN)
-    texts = [b.text for row in main_kb(REDACTED, "ru").keyboard for b in row]
+    monkeypatch.setattr(menu, "is_admin", lambda tg: True)
+    texts = [b.text for row in main_kb(12345678, "ru").keyboard for b in row]
     for t in (BTN_ANALYTICS, BTN_RECORD, "Программа зала", BTN_COMP_SECTION,
               "Питание", "Профиль", BTN_ADMIN):
         assert t in texts, t

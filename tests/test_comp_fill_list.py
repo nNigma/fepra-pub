@@ -24,9 +24,9 @@ def _make_event(botdb, con, *, name, tg_id, city="A", date="2026-04-12",
 def test_list_competitions():
     from tjbot import db as botdb
     con = _con()
-    eid, did = _make_event(botdb, con, name="Кубок Владимира", tg_id=REDACTED,
+    eid, did = _make_event(botdb, con, name="Кубок Владимира", tg_id=12345678,
                            city="Владимир", date="2026-04-12")
-    rows = botdb.list_competitions(con, REDACTED)
+    rows = botdb.list_competitions(con, 12345678)
     match = next((r for r in rows if r["id"] == eid), None)
     assert match is not None
     assert match["name"] == "Кубок Владимира"

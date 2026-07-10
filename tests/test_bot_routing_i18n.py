@@ -14,8 +14,8 @@ def test_all_variants_covers_menu_buttons():
 
 
 def test_main_kb_labels_follow_lang():
-    kb_ru = menu.main_kb(REDACTED, "ru")
-    kb_en = menu.main_kb(REDACTED, "en")
+    kb_ru = menu.main_kb(12345678, "ru")
+    kb_en = menu.main_kb(12345678, "en")
     flat = lambda kb: [b.text for row in kb.keyboard for b in row]
     assert "Записать тренировку" in flat(kb_ru)
     assert "Log workout" in flat(kb_en)

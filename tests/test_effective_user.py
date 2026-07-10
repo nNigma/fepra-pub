@@ -1,6 +1,6 @@
 from tjapp.auth import resolve_effective_user
 
-ADMIN = REDACTED
+ADMIN = 12345678
 FRIEND = 111
 STRANGER = 999
 
