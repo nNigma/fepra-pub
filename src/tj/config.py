@@ -127,3 +127,28 @@ def athlete(cfg: dict) -> tuple[int, str]:
 
 def timezone(cfg: dict) -> str:
     return cfg.get("user", {}).get("timezone", "UTC")
+
+
+_CLAUDE_ENABLED_CACHE: bool | None = None
+
+
+def claude_enabled() -> bool:
+    """Включён ли Claude-путь. Приоритет: env KUZ_USE_CLAUDE (живой, для тестов и
+    systemd) -> config.toml [llm].use_claude -> False. Чтение config кэшируется."""
+    env = os.environ.get("KUZ_USE_CLAUDE")
+    if env is not None:
+        return env.strip().lower() in ("1", "true", "yes", "on")
+    global _CLAUDE_ENABLED_CACHE
+    if _CLAUDE_ENABLED_CACHE is None:
+        try:
+            cfg = load_config()
+            _CLAUDE_ENABLED_CACHE = bool(cfg.get("llm", {}).get("use_claude", False))
+        except FileNotFoundError:
+            _CLAUDE_ENABLED_CACHE = False
+    return _CLAUDE_ENABLED_CACHE
+
+
+def reset_claude_cache() -> None:
+    """Сброс кэша (для тестов)."""
+    global _CLAUDE_ENABLED_CACHE
+    _CLAUDE_ENABLED_CACHE = None
