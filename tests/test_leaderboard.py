@@ -18,8 +18,8 @@ def test_overall_and_isolation(tmp_path):
     _seed(con, 3, "Chuzhoy", "Другой", "m", 80); _lift(con, 3, "back_squat", 200, "2026-07-01")
     res = leaderboard(con, "Universe", "overall", me_tg_id=2)
     ids = [r["tg_id"] for r in res["rows"]]
-    assert 3 not in ids
-    assert ids[0] == 1 and ids[1] == 2
+    assert 3 not in ids                       # чужой зал не попал
+    assert ids[0] == 1 and ids[1] == 2        # сильнее — выше
     assert res["rows"][0]["place"] == 1
     assert [r for r in res["rows"] if r["is_me"]][0]["tg_id"] == 2
     assert any(d["id"] == "back_squat" for d in res["disciplines"])
@@ -29,8 +29,8 @@ def test_discipline_sort_lift_desc(tmp_path):
     con = botdb.connect(tmp_path / "t.db"); botdb.init_schema(con); botdb.seed_standards(con)
     _seed(con, 1, "A", "Universe", "m", 80); _lift(con, 1, "back_squat", 100, "2026-07-01")
     _seed(con, 2, "B", "Universe", "m", 80); _lift(con, 2, "back_squat", 140, "2026-07-01")
-    _seed(con, 3, "C", "Universe", "m", 80)
+    _seed(con, 3, "C", "Universe", "m", 80)  # без результата — исключён
     res = leaderboard(con, "Universe", "back_squat", me_tg_id=1)
     ids = [r["tg_id"] for r in res["rows"]]
-    assert ids == [2, 1]
-    assert 3 not in ids
+    assert ids == [2, 1]                       # больше вес — выше
+    assert 3 not in ids                        # без результата исключён

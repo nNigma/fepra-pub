@@ -5,7 +5,7 @@ def test_templated_passthrough_and_json():
     g = TemplatedNarrative()
     out = g.render([Block(kind="verdict", title="V", body="ok"),
                     Block(kind="risk", title="R", body="")])
-    assert [b.title for b in out] == ["V"]
+    assert [b.title for b in out] == ["V"]  # empty body filtered
     assert to_json(out) == [{"kind": "verdict", "title": "V", "body": "ok"}]
 
 

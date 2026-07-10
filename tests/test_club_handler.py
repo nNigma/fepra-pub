@@ -89,6 +89,37 @@ def test_edit_entry_shares_add_conversation():
     assert handlers_for_edit[0].callback is club.edit_entry
 
 
+def test_slug_lowercases_and_normalizes():
+    assert club._slug("Гуд Морнинг") == "гуд_морнинг"
+    assert club._slug("Оверхед-присед!") == "оверхед_присед"
+    assert club._slug("  ") == ""
+
+
+def test_register_canon_resolves_and_shows_in_dict():
+    con = _con()
+    club._register_canon(con, "гуд_морнинг")
+    botdb.add_alias(con, "гудморнингов со штангой", "гуд_морнинг")
+    from tj import ontology
+    aliases = botdb.load_aliases(con)
+    assert ontology.resolve("гудморнингов со штангой", aliases) == "гуд_морнинг"
+    text = club._dictionary_text(con)
+    assert "гуд_морнинг: гудморнингов со штангой" in text
+    assert "back_squat:" in text  # статические каноны тоже в словаре
+
+
+def test_add_move_state_registered():
+    conv = club._add_conv()
+    assert club.ADD_MOVE in conv.states
+    patterns = [h.pattern.pattern for h in conv.states[club.ADD_MOVE]
+                if hasattr(h, "pattern") and h.pattern]
+    assert any("mv:dict" in p for p in patterns)
+    assert any("mv:new" in p for p in patterns)
+    assert any("mv:skip" in p for p in patterns)
+    cmv = [h for h in conv.states[club.ADD_CONFIRM]
+           if hasattr(h, "pattern") and h.pattern and "cmv" in h.pattern.pattern]
+    assert cmv and cmv[0].callback is club.mv_start
+
+
 def test_add_input_uses_block_parser():
     from tj.analysis.wod_program import movements_of, parse_program
     board = ("2 ТА.\n- Е2МОМх5х5х80%\nприседание со штангой на спине\n"

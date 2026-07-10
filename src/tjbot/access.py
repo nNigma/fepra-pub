@@ -10,6 +10,7 @@ from datetime import date
 from functools import wraps
 from pathlib import Path
 
+# Суточный лимит обращений к ИИ (разбор + распознавание) для не-админов.
 LLM_DAILY_LIMIT = 7
 
 _ALLOW_DEFAULT = Path(__file__).resolve().parents[2] / "users_allow.json"

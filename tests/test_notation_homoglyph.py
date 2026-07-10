@@ -28,7 +28,7 @@ def test_sets_rounds_words():
 
 def test_rep_scheme_dash_variants():
     assert parse_notation("21-15-9")["scheme"] == [21, 15, 9]
-    assert parse_notation("50–40–30")["scheme"] == [50, 40, 30]
+    assert parse_notation("50–40–30")["scheme"] == [50, 40, 30]   # en-dash
 
 def test_weight_reps_variants():
     for s, exp in [("80х5",(80.0,5)),("80x5",(80.0,5)),("80×5",(80.0,5)),
@@ -38,7 +38,7 @@ def test_weight_reps_variants():
 def test_negatives_no_false_positive():
     assert parse_notation("е момент") is None
     assert parse_notation("рывок 6 см") is None
-    assert parse_notation("становая 100-110-130") is None
+    assert parse_notation("становая 100-110-130") is None   # вес-раскладка, не схема
 
 def test_cap_variants():
     from tj.analysis.wod_notation import has_cap

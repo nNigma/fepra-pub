@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from . import muscles
 from .engine import daily_loads
 from .load import acwr
 from .narrative import to_json, workout_blocks
@@ -16,19 +17,24 @@ from .verdict import verdict
 
 
 def _row(a, lang="ru") -> dict:
+    vals = tuple(a)
     (day, sport, dur, ahr, mhr, cal, wod_name, wod_fmt,
-     scaling, load_kg, score, rpe, raw_extra, source) = a
+     scaling, load_kg, score, rpe, raw_extra, source) = vals[:14]
+    dist, pace, power, elev = (list(vals[14:18]) + [None] * 4)[:4]
     extra = json.loads(raw_extra) if raw_extra else {}
     return {"day": day, "sport": sport, "duration_min": dur, "avg_hr": ahr,
             "max_hr": mhr, "calories": cal, "wod_name": wod_name, "wod_format": wod_fmt,
             "scaling": scaling, "load_kg": load_kg, "score": score, "rpe": rpe,
             "source": source, "extra": extra,
+            "distance_km": dist, "avg_pace_s_per_km": pace,
+            "avg_power_w": power, "elevation_gain_m": elev,
             "zones": extra.get("time_in_zones"),
             "narrative": to_json(workout_blocks(extra, max_hr=mhr, lang=lang))}
 
 
 _KEEP = ("wod_name", "wod_format", "scaling", "load_kg", "score", "rpe",
-         "duration_min", "avg_hr", "max_hr", "calories")
+         "duration_min", "avg_hr", "max_hr", "calories",
+         "distance_km", "avg_pace_s_per_km", "avg_power_w", "elevation_gain_m")
 
 
 def _merge(a: dict, b: dict, lang="ru") -> dict:
@@ -109,7 +115,7 @@ def workout_report(db_path, backend, hr_max, sex, day: str, *, tg_id, lang="ru")
     condition = None
     if day in days:
         i = days.index(day)
-        row = daily[i]
+        row = daily[i]   # 0 day,1 rhr,2 hrv,3 readiness,4 sleep,5 bb,6 stress
 
         def _delta(col):
             base = _asof_base(daily, i, col)
@@ -121,6 +127,7 @@ def workout_report(db_path, backend, hr_max, sex, day: str, *, tg_id, lang="ru")
                      "sleep_h": row[4], "acwr": acwr_d, "verdict": v,
                      "hrv_delta": _delta(2), "sleep_delta": _delta(4)}
 
+    # like-for-like: прошлые сессии той же программы (по wod_name), старые -> новые
     history: dict[str, list[dict]] = {}
     for s in sessions:
         name = s["wod_name"]
@@ -131,4 +138,5 @@ def workout_report(db_path, backend, hr_max, sex, day: str, *, tg_id, lang="ru")
         history[name] = prior
 
     return {"day": day, "trimp": round(load_by_day.get(day, 0)), "hr_max": hr_max,
-            "sessions": sessions, "condition": condition, "history": history}
+            "sessions": sessions, "condition": condition, "history": history,
+            "muscles": muscles.workout_muscles(sessions)}

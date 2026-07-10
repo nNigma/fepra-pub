@@ -1,11 +1,11 @@
 from __future__ import annotations
-import json
 from tj import llm
+
+FLASH = [("k", "gemini-2.5-flash")]
 
 
 def test_no_key_returns_none(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setattr(llm, "gemini_key", lambda paid=False: None)
+    monkeypatch.setattr(llm, "_attempts", lambda paid=True, model=None: [])
     assert llm.has_llm() is False
     assert llm.complete("sys", "user") is None
 
@@ -13,12 +13,12 @@ def test_no_key_returns_none(monkeypatch):
 def test_gemini_key_routing(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "free")
     monkeypatch.setenv("GEMINI_COST_API_KEY", "paid")
-    assert llm.gemini_key() == "free"
-    assert llm.gemini_key(paid=True) == "paid"
+    assert llm.gemini_key() == "free"            # текст → бесплатный
+    assert llm.gemini_key(paid=True) == "paid"   # vision → платный
 
 
 def test_complete_parses_text(monkeypatch):
-    monkeypatch.setattr(llm, "gemini_key", lambda paid=False: "k")
+    monkeypatch.setattr(llm, "_attempts", lambda paid=True, model=None: FLASH)
     captured = {}
 
     class _Resp:
@@ -42,7 +42,7 @@ def test_complete_parses_text(monkeypatch):
 
 
 def test_complete_http_error_returns_none(monkeypatch):
-    monkeypatch.setattr(llm, "gemini_key", lambda paid=False: "k")
+    monkeypatch.setattr(llm, "_attempts", lambda paid=True, model=None: FLASH)
 
     def _boom(*a, **k):
         raise RuntimeError("net")
@@ -50,8 +50,30 @@ def test_complete_http_error_returns_none(monkeypatch):
     assert llm.complete("s", "u") is None
 
 
+def test_complete_falls_back_to_second_key(monkeypatch):
+    monkeypatch.setattr(llm, "_attempts", lambda paid=True, model=None:
+                        [("bad", "gemini-2.5-pro"), ("free", "gemini-2.5-flash")])
+    calls = []
+
+    class _Resp:
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": "фолбэк"}]}}],
+                    "usageMetadata": {}}
+        def raise_for_status(self): pass
+
+    def _post(url, json=None, timeout=None):
+        calls.append(url)
+        if "bad" in url:
+            raise RuntimeError("paid down")
+        return _Resp()
+
+    monkeypatch.setattr(llm.httpx, "post", _post)
+    assert llm.complete("s", "u") == "фолбэк"
+    assert len(calls) == 2 and "flash" in calls[1]
+
+
 def test_vision_parses_text(monkeypatch):
-    monkeypatch.setattr(llm, "gemini_key", lambda paid=False: "k")
+    monkeypatch.setattr(llm, "_attempts", lambda paid=True, model=None: FLASH)
     captured = {}
 
     class _Resp:

@@ -23,7 +23,7 @@ def test_advice_created_at_full_timestamp():
     con = _con()
     botdb.next_advice_put(con, 1, "claude", "совет")
     created = botdb.next_advice_get(con, 1)["created_at"]
-    assert "T" in created
+    assert "T" in created  # полный ISO-таймстамп, не только дата
 
 
 def test_stale_when_data_newer_than_advice():
@@ -35,9 +35,9 @@ def test_stale_when_data_newer_than_advice():
     con.commit()
     created = botdb.next_advice_get(con, 1)["created_at"]
     dv = botdb.data_version(con)
-    assert dv > created
+    assert dv > created  # данные новее → совет устарел
 
     con.execute('INSERT OR REPLACE INTO meta ("key","value") VALUES (?,?)',
                 ("data_version", "2026-07-04T09:00:00+00:00"))
     con.commit()
-    assert botdb.data_version(con) < created
+    assert botdb.data_version(con) < created  # данные старше → не устарел

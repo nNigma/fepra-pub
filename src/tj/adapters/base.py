@@ -17,9 +17,9 @@ from ..models import Activity, DailyMetrics
 @dataclass
 class Capabilities:
     """Что источник реально умеет отдавать."""
-    daily: bool = False
-    activities: bool = False
-    metrics: set[str] = field(default_factory=set)
+    daily: bool = False          # сон/HRV/readiness/...
+    activities: bool = False     # сеансы
+    metrics: set[str] = field(default_factory=set)  # {"hrv","body_battery",...}
 
 
 class Adapter(Protocol):
@@ -31,6 +31,7 @@ class Adapter(Protocol):
     def fetch_activities(self, start: date, end: date) -> list[Activity]: ...
 
 
+# Поле DailyMetrics -> группа приоритета из config [merge] (ключи группы грубее полей).
 _FIELD_GROUP = {
     "sleep_h": "sleep",
     "resting_hr": "hr",

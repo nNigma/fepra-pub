@@ -18,7 +18,7 @@ def test_parse_board_raw_text_list_to_str(monkeypatch):
     monkeypatch.setattr(vision.llm, "vision", lambda *a, **k: json.dumps(payload))
     draft = vision.parse_board(b"jpegbytes")
     assert isinstance(draft["raw_text"], str)
-    assert draft["raw_text"][:900] == "WOD 1\n21-15-9\nтрастеры"
+    assert draft["raw_text"][:900] == "WOD 1\n21-15-9\nтрастеры"       # конкатенация не упадёт
 
 
 def test_parse_text_raw_text_list_to_str(monkeypatch):

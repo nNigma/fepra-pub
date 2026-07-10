@@ -12,7 +12,7 @@ from pathlib import Path
 
 def _frontmatter():
     try:
-        import frontmatter
+        import frontmatter  # python-frontmatter
     except ImportError as e:
         raise RuntimeError(
             "Нужен python-frontmatter: pip install -e . (см. README)."

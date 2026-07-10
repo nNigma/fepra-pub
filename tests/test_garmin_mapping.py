@@ -18,6 +18,7 @@ _A = GarminAdapter(email="x", password="y", tokenstore="/tmp/ts", tz="Asia/Almat
 
 
 def test_activity_run_tz_day_and_pace():
+    # 23 июня 20:00 UTC -> Алматы (+05) -> локальный день уезжает на 24-е (SPEC §5)
     run = _A._map_activity({
         "activityId": 123, "activityType": {"typeKey": "running"},
         "startTimeGMT": "2026-06-23 20:00:00",
@@ -39,7 +40,7 @@ def test_activity_crossfit_splits_to_strength():
         "averageHR": 130, "maxHR": 160, "calories": 250,
     })
     assert wod.sport is Sport.CROSSFIT
-    assert wod.strength is not None
+    assert wod.strength is not None      # факт WOD заполняется вручную (SPEC §6)
     assert wod.endurance is None
 
 
@@ -67,23 +68,24 @@ def test_workout_frontmatter_keeps_manual():
     assert base == {"date": "2026-06-24", "type": "workout", "sport": "run"}
     assert owned["watch"]["calories"] == 300
     assert owned["endurance"]["distance_km"] == 5.0
-    assert "wod" not in owned and "performed" not in owned
+    assert "wod" not in owned and "performed" not in owned     # ручное не трогаем
 
 
 def test_daily_drops_garmin_sentinels():
+    # Garmin шлёт -2 для stress при отсутствии данных; RHR может быть None
     dm = _A._map_daily(date(2025, 7, 19), {
         "stats": {"restingHeartRate": None, "averageStressLevel": -2},
         "hrv": {"hrvSummary": {"lastNightAvg": 65}},
         "training_readiness": [{"score": 74}],
     })
-    assert dm.stress_avg is None
+    assert dm.stress_avg is None        # -2 -> None, не мусорное значение
     assert dm.resting_hr is None
     assert dm.hrv == 65 and dm.readiness == 74
 
 
 def test_merge_daily_per_field_priority():
-    g = DailyMetrics(day=date(2026, 6, 24), hrv=60, resting_hr=48)
-    ap = DailyMetrics(day=date(2026, 6, 24), hrv=55, sleep_h=7.0)
+    g = DailyMetrics(day=date(2026, 6, 24), hrv=60, resting_hr=48)   # sleep_h None
+    ap = DailyMetrics(day=date(2026, 6, 24), hrv=55, sleep_h=7.0)    # resting_hr None
     m = merge_daily(
         [("garmin", g), ("apple_health", ap)],
         {"hrv": ["garmin", "apple_health"],

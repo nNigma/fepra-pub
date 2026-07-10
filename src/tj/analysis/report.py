@@ -74,6 +74,7 @@ def _zone(v):
     return "риск"
 
 
+# --- чтение БД ---------------------------------------------------------------
 
 def _read_full(db_path, backend, tg_id):
     con, _ = _connect(Path(db_path), backend)
@@ -83,14 +84,17 @@ def _read_full(db_path, backend, tg_id):
             'from daily where "tg_id"=? order by "day"', (tg_id,)).fetchall()
         acts = con.execute(
             'select "day","sport","duration_min","avg_hr","max_hr","calories",'
-            '"wod_name","wod_format","perf_scaling","perf_load_kg","perf_score","perf_rpe","extra","source" '
+            '"wod_name","wod_format","perf_scaling","perf_load_kg","perf_score","perf_rpe","extra","source",'
+            '"distance_km","avg_pace_s_per_km","avg_power_w","elevation_gain_m" '
             'from activities where "tg_id"=? order by "day"', (tg_id,)).fetchall()
     finally:
         con.close()
     return daily, acts
 
 
+# --- заметка на каждый день --------------------------------------------------
 
+# индекс колонки в строке daily -> (подпись, ниже_плохо, порог флага)
 _DAY_METRICS = [
     ("Сон, ч", 4, True, 1),
     ("HRV", 2, True, 5),
@@ -202,7 +206,7 @@ def _day_note(day, i, daily, loads, day_acts):
 def build_day_summaries(db_path, backend, hr_max, sex, *, tg_id, days_window=3, all_days=False) -> dict:
     daily, acts = _read_full(db_path, backend, tg_id)
     days = [r[0] for r in daily]
-    _, loads = daily_loads(db_path, backend, hr_max, sex, tg_id=tg_id)
+    _, loads = daily_loads(db_path, backend, hr_max, sex, tg_id=tg_id)   # выровнен по days
     acts_by_day = {}
     for a in acts:
         acts_by_day.setdefault(a[0], []).append(a)
@@ -210,6 +214,7 @@ def build_day_summaries(db_path, backend, hr_max, sex, *, tg_id, days_window=3, 
     return {days[i]: _day_note(days[i], i, daily, loads, acts_by_day.get(days[i], [])) for i in targets}
 
 
+# --- общий обзор (_Обзор.md) -------------------------------------------------
 
 def _weekly(days, loads):
     buckets, order = {}, []
@@ -243,7 +248,7 @@ def _svg_calendar(rows):
             return "#8a887f"
         return "#1d9e75" if r >= 70 else "#ef9f27" if r >= 45 else "#e24b4a"
 
-    pad = datetime.date.fromisoformat(rows[0][0]).weekday()
+    pad = datetime.date.fromisoformat(rows[0][0]).weekday()   # Пн=0
     weeks = (pad + len(rows) + 6) // 7
     W, H = 7 * (cell + gap), top + weeks * (cell + gap)
     p = [f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" role="img">']

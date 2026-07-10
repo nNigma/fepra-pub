@@ -74,7 +74,7 @@ def extract_maxes(blocks, text: str) -> list[dict]:
         if not b.get("movements"):
             continue
         name = b["movements"][0]["name"]
-        best = None
+        best = None   # (weight, reps)
         for val in sections.get(name.strip().lower(), []):
             wr = parse_weight_reps(val)
             if not wr:

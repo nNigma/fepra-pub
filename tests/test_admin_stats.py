@@ -30,12 +30,12 @@ def test_period_since_7_days():
 
 def test_stats_text_all_time():
     con = _con()
-    botdb.save_user(con, 42, nick="Игрок", height_cm=180, weight_kg=80, sex="m", age=36, gym="Universe")
+    botdb.save_user(con, 42, nick="Петя", height_cm=180, weight_kg=80, sex="m", age=36, gym="Universe")
     botdb.log_action(con, 42, "workout_recorded", ts="2026-07-05T10:00:00+00:00")
     botdb.log_action(con, 42, "workout_recorded", ts="2026-07-05T11:00:00+00:00")
     botdb.log_action(con, 42, "goal_set", ts="2026-01-01T10:00:00+00:00")
     text = admin._stats_text(con, "all", NOW, "ru")
-    assert "Игрок (42)" in text
+    assert "Петя (42)" in text
     assert "Тренировка 2" in text
     assert "Цель 1" in text
     assert "всего: 3" in text
@@ -43,7 +43,7 @@ def test_stats_text_all_time():
 
 def test_stats_text_period_excludes_old():
     con = _con()
-    botdb.save_user(con, 42, nick="Игрок", height_cm=180, weight_kg=80, sex="m", age=36, gym="Universe")
+    botdb.save_user(con, 42, nick="Петя", height_cm=180, weight_kg=80, sex="m", age=36, gym="Universe")
     botdb.log_action(con, 42, "workout_recorded", ts="2026-07-05T10:00:00+00:00")
     botdb.log_action(con, 42, "goal_set", ts="2026-01-01T10:00:00+00:00")
     text = admin._stats_text(con, "7", NOW, "ru")

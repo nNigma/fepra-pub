@@ -78,7 +78,7 @@ def test_ladder_per_movement_per_round_units():
                              {"name": "бёрпи", "canon": "burpee", "weighted": False}]}]
     out = render_template(blocks)
     assert "становая тяга:" in out
-    assert "раунд 1 - 21 повт, вес: ___" in out
-    assert "раунд 2 - 15 ккал: ___" in out
-    assert "раунд 3 - 9 повт: ___" in out
+    assert "раунд 1 - 21 повт, вес: ___" in out      # weighted -> вес
+    assert "раунд 2 - 15 ккал: ___" in out            # cardio -> ккал
+    assert "раунд 3 - 9 повт: ___" in out             # gymnastics -> повт
     assert "время (мм:сс): ___" in out

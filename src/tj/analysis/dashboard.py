@@ -14,10 +14,20 @@ from tj import i18n
 from ..store.build import _connect
 from .advice import next_session_advice
 from .engine import analyze, daily_loads
+from .muscles import week_muscles
 from .narrative import period_blocks, to_json
 from .report import _read_full
 from .state import baseline, classify, decompose_readiness, microcycle, risk_flag
 from .verdict import verdict
+
+
+_RISK_METRIC = {"rhr": "rhr", "hrv": "hrv", "bb_charge": "bb",
+                "respiration_rest": "respiration", "spo2": "spo2"}
+
+
+def _risk_driver_names(drivers, lang):
+    """Сырые ключи сигналов риска -> человеческие названия метрик."""
+    return [i18n.t(f"metric.{_RISK_METRIC.get(d, d)}.name", lang) for d in drivers]
 
 
 def _first(seq, key, default=None):
@@ -44,9 +54,20 @@ def _metrics_payload(full_rows, extra_list, rdy_base, rhr_base, hrv_base, sleep_
     raw["bb"] = [ex.get("bb_charge") for ex in extra_list]
     raw["sleep_score"] = [ex.get("sleep_score") for ex in extra_list]
     raw["vo2max"] = [ex.get("vo2max") for ex in extra_list]
+    raw["spo2"] = [ex.get("spo2_avg") for ex in extra_list]
+    raw["respiration"] = [ex.get("respiration_rest") for ex in extra_list]
+    raw["sleep_deep"] = [ex.get("sleep_deep_h") for ex in extra_list]
+    raw["sleep_rem"] = [ex.get("sleep_rem_h") for ex in extra_list]
+    raw["weight"] = [r[6] for r in full_rows]
 
-    def _ser(vals):
-        return [[d, v] for d, v in zip(all_days, vals) if v is not None][-days:]
+    def _ser(vals, keep=days):
+        pts = [[d, v] for d, v in zip(all_days, vals) if v is not None]
+        if keep:
+            pts = pts[-keep:]
+        if len(pts) > 60:                     # медленные метрики: вся история, даунсемпл
+            step = (len(pts) - 1) / 59
+            pts = [pts[round(i * step)] for i in range(60)]
+        return pts
 
     def _base(vals, precomputed=None):
         if precomputed:
@@ -54,20 +75,49 @@ def _metrics_payload(full_rows, extra_list, rdy_base, rhr_base, hrv_base, sleep_
         b = baseline(vals)
         return round(b["mean"], 1) if b else None
 
+    # окно None = вся история (VO₂max и вес меняются месяцами, 30 точек — флэт)
     spec = {
-        "readiness": ("Готовность", "low_bad", rdy_base),
-        "rhr": ("Пульс покоя", "high_bad", rhr_base),
-        "hrv": ("HRV", "low_bad", hrv_base),
-        "sleep": ("Сон, ч", "low_bad", sleep_base),
-        "bb": ("Ночной заряд", "low_bad", None),
-        "sleep_score": ("Sleep score", "low_bad", None),
-        "vo2max": ("VO₂max", "low_bad", None),
+        "readiness": ("Готовность", "low_bad", rdy_base, days),
+        "rhr": ("Пульс покоя", "high_bad", rhr_base, days),
+        "hrv": ("HRV", "low_bad", hrv_base, days),
+        "sleep": ("Сон, ч", "low_bad", sleep_base, days),
+        "bb": ("Ночной заряд", "low_bad", None, days),
+        "sleep_score": ("Sleep score", "low_bad", None, days),
+        "vo2max": ("VO₂max", "low_bad", None, None),
+        "spo2": ("Сатурация (SpO₂)", "low_bad", None, days),
+        "respiration": ("Дыхание", "high_bad", None, days),
+        "sleep_deep": ("Глубокий сон", "low_bad", None, days),
+        "sleep_rem": ("REM-сон", "low_bad", None, days),
+        "weight": ("Вес, кг", "low_bad", None, None),
     }
     out = {}
-    for k, (label, direction, pre) in spec.items():
+    for k, (label, direction, pre, keep) in spec.items():
         out[k] = {"label": label, "dir": direction,
-                  "series": _ser(raw[k]), "base": _base(raw[k], pre)}
+                  "series": _ser(raw[k], keep), "base": _base(raw[k], pre)}
     return out
+
+
+_TS_LABEL = {
+    "PEAKING": {"ru": "Пик формы", "en": "Peaking"},
+    "PRODUCTIVE": {"ru": "Продуктивно", "en": "Productive"},
+    "MAINTAINING": {"ru": "Поддержание", "en": "Maintaining"},
+    "RECOVERY": {"ru": "Восстановление", "en": "Recovery"},
+    "OVERREACHING": {"ru": "Перегрузка", "en": "Overreaching"},
+    "STRAINED": {"ru": "Перенапряжение", "en": "Strained"},
+    "UNPRODUCTIVE": {"ru": "Непродуктивно", "en": "Unproductive"},
+    "DETRAINING": {"ru": "Растренированность", "en": "Detraining"},
+}
+
+
+def _ts_human(phrase, lang="ru"):
+    """Garmin trainingStatusFeedbackPhrase (MAINTAINING_1) -> человеческий лейбл."""
+    if not phrase:
+        return None
+    up = str(phrase).upper()
+    for pref, names in _TS_LABEL.items():
+        if up.startswith(pref):
+            return names.get(lang) or names["ru"]
+    return str(phrase).replace("_", " ").title()
 
 
 def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict:
@@ -145,7 +195,7 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
     def _sig(metric_id, value, base):
         return {"label": i18n.t(f"metric.{metric_id}.name", lang), "value": value,
                 "base": i18n.t("metric.base_prefix", lang, v=base["mean"]),
-                "cls": classify(value, base, metric_id in ("hrv", "sleep", "bb", "sleep_score"))}
+                "cls": classify(value, base, metric_id in ("hrv", "sleep", "bb", "sleep_score", "spo2"))}
 
     signals = {}
     if hrv_cur is not None and hrv_base:
@@ -158,14 +208,18 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
     bb_vals = [ex.get("bb_charge") for ex in extra_list if ex.get("bb_charge") is not None]
     resp_vals = [ex.get("respiration_rest") for ex in extra_list if ex.get("respiration_rest") is not None]
     ss_vals = [ex.get("sleep_score") for ex in extra_list if ex.get("sleep_score") is not None]
+    spo2_vals = [ex.get("spo2_avg") for ex in extra_list if ex.get("spo2_avg") is not None]
 
     bb_base = baseline(bb_vals) if len(bb_vals) >= 3 else None
     resp_base = baseline(resp_vals) if len(resp_vals) >= 3 else None
     ss_base = baseline(ss_vals) if len(ss_vals) >= 3 else None
+    spo2_base = baseline(spo2_vals) if len(spo2_vals) >= 3 else None
 
     bb_cur = cur_extra.get("bb_charge")
     resp_cur = cur_extra.get("respiration_rest")
     ss_cur = cur_extra.get("sleep_score")
+    spo2_cur = cur_extra.get("spo2_avg")
+    spo2_low_cur = cur_extra.get("spo2_lowest")
 
     if bb_cur is not None and bb_base:
         signals["bb"] = _sig("bb", bb_cur, bb_base)
@@ -175,6 +229,8 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
         signals["respiration"] = {"label": i18n.t("metric.respiration.name", lang), "value": resp_cur,
                                    "base": i18n.t("metric.base_prefix", lang, v=resp_base["mean"]),
                                    "cls": classify(resp_cur, resp_base, False)}
+    if spo2_cur is not None and spo2_base:
+        signals["spo2"] = _sig("spo2", spo2_cur, spo2_base)
 
     risk_sigs = {}
     if rhr_cur is not None and rhr_base:
@@ -185,8 +241,15 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
         risk_sigs["bb_charge"] = (classify(bb_cur, bb_base, True), True)
     if resp_cur is not None and resp_base:
         risk_sigs["respiration_rest"] = (classify(resp_cur, resp_base, False), False)
+    # SpO₂ — устойчиво низкая сатурация = сигнал недовосстановления. Средняя ниже 93%
+    # или ночной минимум ниже 85%; редкий провал минимума при норм. средней — не флаг.
+    if spo2_cur is not None or spo2_low_cur is not None:
+        spo2_bad = ((spo2_cur is not None and spo2_cur < 93)
+                    or (spo2_low_cur is not None and spo2_low_cur < 85))
+        risk_sigs["spo2"] = ("below" if spo2_bad else "in", True)
     risk = (risk_flag(risk_sigs, lang=lang) if risk_sigs
             else {"level": "green", "title": i18n.t("summary.data_collecting", lang), "drivers": []})
+    risk["drivers"] = _risk_driver_names(risk.get("drivers", []), lang)
 
     def _last_nonnull(xs):
         for x in reversed(xs):
@@ -202,7 +265,12 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
     if weight_last is not None:
         form["weight"] = round(weight_last, 1)
     if training_status is not None:
-        form["status"] = training_status
+        form["status"] = _ts_human(training_status, lang)
+
+    week_cut = (today - datetime.timedelta(days=6)).isoformat()
+    week_sessions = [{"sport": a[1], "score": a[10],
+                      "extra": json.loads(a[12]) if a[12] else {}}
+                     for a in acts if a[0] and week_cut <= a[0] <= today.isoformat()]
 
     today_str = rep["range"][1]
     mc_days_input = []
@@ -222,6 +290,14 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
     agg["next_start_days"] = None
     if len(vo2max_series) >= 2:
         agg["vo2max_delta"] = round(vo2max_series[-1] - vo2max_series[0], 1)
+
+    # плитка VO₂max в сетке метрик (та же форма {latest, delta}, что sleep/hrv/rhr)
+    rep["vo2max"] = ({"latest": round(vo2max_cur, 1),
+                      "delta": agg.get("vo2max_delta")}
+                     if vo2max_cur is not None else None)
+    # последний день с данными часов (для шапки «на {день}»)
+    last_data_day = next((r[0] for r in reversed(full_rows)
+                          if any(r[i] is not None for i in (1, 2, 3, 4))), None)
 
     def _d(b):
         return b["delta"] if b else None
@@ -247,11 +323,18 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
         "today": today_str,
         "generated": today.isoformat(),
         "range": rep["range"],
+        "last_data_day": last_data_day,
         "hr_max": hr_max,
         "verdict": v,
         "m": rep,
         "series": series,
         "sports": sports,
+        "muscles_week": week_muscles(week_sessions),
+        "spo2": ({"avg": spo2_cur, "lowest": spo2_low_cur}
+                 if spo2_cur is not None or spo2_low_cur is not None else None),
+        "hrv_status": cur_extra.get("hrv_status"),
+        "sleep_deep_h": cur_extra.get("sleep_deep_h"),
+        "sleep_rem_h": cur_extra.get("sleep_rem_h"),
         "self_feel": cur_extra.get("self_feel"),
         "state": {
             "risk": risk,

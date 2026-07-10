@@ -51,3 +51,11 @@ def test_non_admin_as_is_ignored(tmp_path, monkeypatch):
     assert data["viewing"] == 111
     assert data["metrics"]["readiness"]["series"][-1] == ["2026-07-01", 42]
     app.dependency_overrides.clear()
+
+
+def test_index_no_cache_header():
+    from fastapi.testclient import TestClient
+    from tjapp.api import app
+    r = TestClient(app).get("/")
+    assert r.status_code == 200
+    assert r.headers.get("cache-control") == "no-cache"

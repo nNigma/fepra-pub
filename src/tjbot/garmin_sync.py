@@ -96,8 +96,32 @@ def last_watch_date(con, tg_id) -> str | None:
     return r["d"] if r and r["d"] else None
 
 
+def _heal_missing_daily(con, botdb, ad, tg_id, since: date, until: date) -> int:
+    rows = con.execute(
+        'SELECT "day" FROM daily WHERE "tg_id"=? AND "day" BETWEEN ? AND ? '
+        'AND "readiness" IS NULL AND "hrv" IS NULL AND "resting_hr" IS NULL '
+        'AND "sleep_h" IS NULL ORDER BY "day"',
+        (tg_id, since.isoformat(), until.isoformat())).fetchall()
+    healed = 0
+    for r in rows:
+        m = ad.fetch_daily(date.fromisoformat(r["day"]))
+        if not m or not any(v is not None for v in
+                            (m.readiness, m.hrv, m.resting_hr, m.sleep_h)):
+            continue
+        con.execute(
+            'UPDATE daily SET "sleep_h"=?, "resting_hr"=?, "hrv"=?, "body_battery"=?, '
+            '"readiness"=?, "stress_avg"=? WHERE "tg_id"=? AND "day"=?',
+            (m.sleep_h, m.resting_hr, m.hrv, m.body_battery, m.readiness,
+             m.stress_avg, tg_id, r["day"]))
+        healed += 1
+    if healed:
+        con.commit()
+        botdb.mark_data_changed(con)
+    return healed
+
+
 def sync_recent(db_path, tg_id, tokenstore, upto: date | None = None,
-                start: date | None = None) -> dict:
+                start: date | None = None, heal_lookback: int = 10) -> dict:
     from . import db as botdb
     con = botdb.connect(db_path)
     try:
@@ -128,7 +152,16 @@ def sync_recent(db_path, tg_id, tokenstore, upto: date | None = None,
                     a.extra = {**(a.extra or {}), "hr_series_ref": ref}
                 botdb.insert_activity(con, a, tg_id=tg_id)
                 n_act += 1
-        return {"days": n_daily, "activities": n_act, "last": last_watch_date(con, tg_id),
+        n_healed = 0
+        if heal_lookback:
+            n_healed = _heal_missing_daily(con, botdb, ad, tg_id,
+                                           upto - timedelta(days=heal_lookback), upto)
+        try:                    # снапшот устройств для «Тюнинга часов» — не критичен
+            botdb.save_devices(con, tg_id, ad.fetch_devices())
+        except Exception:
+            pass
+        return {"days": n_daily, "activities": n_act, "healed": n_healed,
+                "last": last_watch_date(con, tg_id),
                 "from": start.isoformat(), "to": upto.isoformat()}
     finally:
         con.close()

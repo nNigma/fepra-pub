@@ -6,7 +6,7 @@ def test_daily_composite_pk_and_tg_id(tmp_path):
     botdb.init_schema(con)
     cols = [r[1] for r in con.execute('PRAGMA table_info(daily)')]
     assert "tg_id" in cols
-    pk = [r[1] for r in con.execute('PRAGMA table_info(daily)') if r[5]]
+    pk = [r[1] for r in con.execute('PRAGMA table_info(daily)') if r[5]]  # r[5]=pk order
     assert set(pk) == {"tg_id", "day"}
     acols = [r[1] for r in con.execute('PRAGMA table_info(activities)')]
     assert "tg_id" in acols

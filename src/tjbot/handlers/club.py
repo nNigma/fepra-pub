@@ -7,6 +7,7 @@ ConversationHandler с распознаванием фото/текста чер
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
@@ -14,7 +15,7 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
 from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
                           ConversationHandler, MessageHandler, filters)
 
-from tj import i18n
+from tj import i18n, ontology
 
 from .. import activity
 from .. import db as botdb
@@ -29,7 +30,20 @@ BTN_CLUB_STATS = "📊 Стата зала"
 BTN_CLUB_ADD = "➕ Добавить"
 BTN_CLUB_EDIT = "✏️ Редактировать программу"
 
-VIEW_DATE, ADD_DATE, ADD_DATE_INPUT, ADD_INPUT, ADD_CONFIRM = range(5)
+VIEW_DATE, ADD_DATE, ADD_DATE_INPUT, ADD_INPUT, ADD_ENGINE, ADD_CONFIRM, ADD_MOVE = range(7)
+
+
+def _engine_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("record.btn_engine_fast", lang), callback_data="ceng:fast"),
+        InlineKeyboardButton(i18n.t("record.btn_engine_slow", lang), callback_data="ceng:slow"),
+    ]])
+
+
+def _board_failed_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("record.btn_retry_recognize", lang), callback_data="cretry"),
+    ]])
 
 
 def club_kb(admin: bool, lang: str = "ru") -> ReplyKeyboardMarkup:
@@ -53,6 +67,48 @@ def _parse_alias_lines(text: str):
         alias, canon = alias.strip().lower(), canon.strip()
         if alias and canon:
             out.append((alias, canon))
+    return out
+
+
+_SLUG_RE = re.compile(r"[^0-9a-zа-яё]+")
+
+
+def _slug(name: str) -> str:
+    """Имя движения -> канон-id: нижний регистр, не-буквы/цифры -> «_»."""
+    return _SLUG_RE.sub("_", (name or "").lower()).strip("_")
+
+
+def _register_canon(con, slug: str) -> None:
+    """Регистрирует лёгкий канон (self-alias), чтобы он резолвился и попадал в словарь."""
+    botdb.add_alias(con, slug, slug, source="manual")
+
+
+def _dictionary_text(con, lang: str = "ru") -> str:
+    """Текст словаря «канон: алиас1, алиас2» — статические + рантайм-алиасы."""
+    groups: dict[str, list[str]] = {}
+    for canon, aliases in ontology.MOVEMENTS.items():
+        groups.setdefault(canon, []).extend(aliases)
+    for alias, canon in botdb.load_aliases(con).items():
+        groups.setdefault(canon, [])
+        if alias != canon:
+            groups[canon].append(alias)
+    lines = [i18n.t("club.dict_header", lang)]
+    for canon in sorted(groups):
+        al = list(dict.fromkeys(groups[canon]))
+        lines.append(f"{canon}: {', '.join(al)}" if al else f"{canon}:")
+    return "\n".join(lines)
+
+
+def _chunks(text: str, limit: int = 3500) -> list[str]:
+    out, buf = [], ""
+    for line in text.split("\n"):
+        if buf and len(buf) + len(line) + 1 > limit:
+            out.append(buf)
+            buf = line
+        else:
+            buf = line if not buf else f"{buf}\n{line}"
+    if buf:
+        out.append(buf)
     return out
 
 
@@ -260,26 +316,64 @@ async def add_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .. import vision
     lang = context.user_data.get("lang", "ru")
     msg = update.message
-    raw_text = None
     if msg.photo:
-        if vision.has_vision():
-            await msg.reply_text(i18n.t("club.parsing_photo", lang))
-            try:
-                f = await context.bot.get_file(msg.photo[-1].file_id)
-                buf = await f.download_as_bytearray()
-                db = vision.parse_board(bytes(buf))
-            except Exception:
-                db = None
-            raw_text = db.get("raw_text") if db else None
-        if not raw_text:
+        context.user_data["club_photo"] = msg.photo[-1].file_id
+        if not vision.has_vision():
             await msg.reply_text(i18n.t("club.photo_not_recognized", lang))
             return ADD_INPUT
-    else:
-        text = (msg.text or "").strip()
-        if _is_menu_text(text) or len(text) < 4:
-            await msg.reply_text(i18n.t("club.send_text_or_photo", lang))
-            return ADD_INPUT
-        raw_text = text
+        await msg.reply_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+        return ADD_ENGINE
+    text = (msg.text or "").strip()
+    if _is_menu_text(text) or len(text) < 4:
+        await msg.reply_text(i18n.t("club.send_text_or_photo", lang))
+        return ADD_INPUT
+    return await _finish_add_input(msg, context, text, "text")
+
+
+async def add_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Выбор движка распознавания программы зала: быстрый Gemini / медленный Claude."""
+    from .. import vision
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    engine = "claude" if q.data == "ceng:slow" else "gemini"
+    file_id = context.user_data.get("club_photo")
+    if not file_id:
+        await q.edit_message_text(i18n.t("club.send_text_or_photo", lang))
+        return ADD_INPUT
+    await q.edit_message_text(i18n.t(
+        "record.parsing_photo_slow" if engine == "claude" else "record.parsing_photo", lang))
+    db = None
+    try:
+        f = await context.bot.get_file(file_id)
+        buf = await f.download_as_bytearray()
+        db = vision.parse_board(bytes(buf), engine=engine)
+    except Exception:
+        db = None
+    raw_text = db.get("raw_text") if db else None
+    if not raw_text:
+        await q.message.reply_text(i18n.t("club.photo_not_recognized", lang),
+                                   reply_markup=_board_failed_kb(lang))
+        return ADD_INPUT
+    if db.get("engine_used") and db["engine_used"] != engine:
+        await q.message.reply_text(i18n.t("record.board_engine_swapped", lang))
+    return await _finish_add_input(q.message, context, raw_text, "photo")
+
+
+async def add_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """«Попробовать ещё раз» после сбоя распознавания программы: переспросить движок."""
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    if not context.user_data.get("club_photo"):
+        await q.edit_message_text(i18n.t("club.send_text_or_photo", lang))
+        return ADD_INPUT
+    await q.edit_message_text(i18n.t("record.ask_engine", lang), reply_markup=_engine_kb(lang))
+    return ADD_ENGINE
+
+
+async def _finish_add_input(msg, context: ContextTypes.DEFAULT_TYPE, raw_text: str, source: str) -> int:
+    lang = context.user_data.get("lang", "ru")
     if not raw_text or len(raw_text.strip()) < 4:
         await msg.reply_text(i18n.t("club.empty_send_again", lang))
         return ADD_INPUT
@@ -294,8 +388,7 @@ async def add_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     fmt = "+".join(dict.fromkeys(b["format"] for b in blocks)) or "other"
     context.user_data["draft"] = {
         "raw_text": raw_text, "format": fmt,
-        "canon": canon, "unknown": unknown,
-        "source": "photo" if msg.photo else "text"}
+        "canon": canon, "unknown": unknown, "source": source}
     await _show_confirm(msg, context)
     return ADD_CONFIRM
 
@@ -304,16 +397,19 @@ async def _show_confirm(message, context: ContextTypes.DEFAULT_TYPE) -> None:
     from tj.analysis.wod_program import annotate
     lang = context.user_data.get("lang", "ru")
     d = context.user_data["draft"]
+    await message.reply_text(
+        i18n.t("club.program_body", lang, annotated=annotate(d["raw_text"])[:3500]))
     names = ", ".join(d["canon"]) or i18n.t("club.dash", lang)
-    body = i18n.t("club.confirm_header", lang, day=context.user_data["cday"],
-                  annotated=annotate(d["raw_text"])[:900], names=names)
+    body = i18n.t("club.movements_line", lang, names=names)
     if d["unknown"]:
         body += i18n.t("club.unknown_movements", lang, names=", ".join(d["unknown"]))
-    kb = InlineKeyboardMarkup([[
+    rows = [[
         InlineKeyboardButton(i18n.t("club.btn_confirm", lang), callback_data="cok"),
         InlineKeyboardButton(i18n.t("club.btn_fix", lang), callback_data="cedit"),
-    ]])
-    await message.reply_text(body, reply_markup=kb)
+    ]]
+    if d["unknown"]:
+        rows.append([InlineKeyboardButton(i18n.t("club.btn_add_move", lang), callback_data="cmv")])
+    await message.reply_text(body, reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def add_map(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -334,6 +430,124 @@ async def add_map(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ADD_CONFIRM
 
 
+def _mv_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("club.btn_dict", lang), callback_data="mv:dict"),
+        InlineKeyboardButton(i18n.t("club.btn_new_as_is", lang), callback_data="mv:new"),
+        InlineKeyboardButton(i18n.t("club.btn_skip_move", lang), callback_data="mv:skip"),
+    ]])
+
+
+async def _mv_ask(message, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Спросить про следующую нераспознанную фразу; очередь пуста -> перепарс и подтверждение."""
+    lang = context.user_data.get("lang", "ru")
+    queue = context.user_data.get("mv_queue") or []
+    if not queue:
+        con = botdb.connect(context.bot_data["db_path"])
+        try:
+            _restandardize(con, context.user_data["draft"])
+        finally:
+            con.close()
+        await message.reply_text(i18n.t("club.mv_all_done", lang))
+        await _show_confirm(message, context)
+        return ADD_CONFIRM
+    await message.reply_text(
+        i18n.t("club.mv_ask", lang, phrase=queue[0]), reply_markup=_mv_kb(lang))
+    return ADD_MOVE
+
+
+async def mv_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    d = context.user_data.get("draft") or {}
+    context.user_data["mv_queue"] = list(d.get("unknown") or [])
+    return await _mv_ask(q.message, context)
+
+
+async def mv_dict(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        text = _dictionary_text(con, lang)
+    finally:
+        con.close()
+    for chunk in _chunks(text):
+        await q.message.reply_text(chunk)
+    return ADD_MOVE
+
+
+async def mv_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    queue = context.user_data.get("mv_queue") or []
+    if not queue:
+        return await _mv_ask(q.message, context)
+    phrase = queue.pop(0)
+    slug = _slug(phrase)
+    if not slug:
+        await q.message.reply_text(i18n.t("club.mv_empty_slug", lang))
+        return await _mv_ask(q.message, context)
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        _register_canon(con, slug)
+        botdb.add_alias(con, phrase, slug, source="manual")
+    finally:
+        con.close()
+    await q.message.reply_text(i18n.t("club.mv_new_canon", lang, slug=slug, phrase=phrase))
+    return await _mv_ask(q.message, context)
+
+
+async def mv_skip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    lang = context.user_data.get("lang", "ru")
+    queue = context.user_data.get("mv_queue") or []
+    phrase = queue.pop(0) if queue else ""
+    await q.message.reply_text(i18n.t("club.mv_skipped", lang, phrase=phrase))
+    return await _mv_ask(q.message, context)
+
+
+async def mv_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "ru")
+    queue = context.user_data.get("mv_queue") or []
+    if not queue:
+        return await _mv_ask(update.message, context)
+    name = (update.message.text or "").strip()
+    phrase = queue[0]
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        aliases = botdb.load_aliases(con)
+        canon = ontology.resolve(name, aliases)
+        name_is_alias = canon is not None
+        if not canon:
+            found = ontology.find(name, aliases)
+            canon = found[-1] if found else None
+        if canon:
+            queue.pop(0)
+            botdb.add_alias(con, phrase, canon, source="manual")
+            if not name_is_alias:
+                botdb.add_alias(con, name, canon, source="manual")
+            msg = i18n.t("club.mv_mapped", lang, phrase=phrase, canon=canon)
+        else:
+            queue.pop(0)
+            slug = _slug(name)
+            if not slug:
+                await update.message.reply_text(i18n.t("club.mv_empty_slug", lang))
+                queue.insert(0, phrase)
+                return await _mv_ask(update.message, context)
+            _register_canon(con, slug)
+            botdb.add_alias(con, name, slug, source="manual")
+            botdb.add_alias(con, phrase, slug, source="manual")
+            msg = i18n.t("club.mv_new_from_name", lang, slug=slug, phrase=phrase)
+    finally:
+        con.close()
+    await update.message.reply_text(msg)
+    return await _mv_ask(update.message, context)
+
+
 async def add_ok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
@@ -342,12 +556,29 @@ async def add_ok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     day = context.user_data.get("cday")
     if not d or not day:
         return ConversationHandler.END
+    from .. import vision
+    from tj.analysis.wod_program import parse_program
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        aliases = botdb.load_aliases(con)
+    finally:
+        con.close()
+    # Claude один раз выверяет блоки шаблона: участники получат исправленную
+    # форму без своих обращений к ИИ. Сбой -> blocks NULL, перепарсят raw_text.
+    vblocks = None
+    blocks = parse_program(d["raw_text"], aliases)
+    if blocks and vision.engine_for(update.effective_user.id) == "claude" and vision.has_claude():
+        await q.edit_message_text(i18n.t("club.checking_template", lang))
+        checked, verified = vision.verify_result_blocks(d["raw_text"], blocks, aliases)
+        if verified:
+            vblocks = checked
     con = botdb.connect(context.bot_data["db_path"])
     try:
         con.execute('DELETE FROM wod_programs WHERE "day"=? AND "gym"=?',
                     (day.isoformat(), "Universe"))
         botdb.add_program(con, day.isoformat(), "Universe", d["raw_text"],
-                          fmt=d["format"], movements=d["canon"], source=d["source"], confirmed=1)
+                          fmt=d["format"], movements=d["canon"], source=d["source"],
+                          confirmed=1, blocks=vblocks)
     finally:
         con.close()
     activity.log(context, update.effective_user.id, activity.CLUB_PROGRAM_ADDED)
@@ -386,11 +617,22 @@ def _add_conv() -> ConversationHandler:
         states={
             ADD_DATE: [CallbackQueryHandler(add_pick_date, pattern=r"^cadd:")],
             ADD_DATE_INPUT: [MessageHandler(menu.not_menu_text(), add_date_input)],
-            ADD_INPUT: [MessageHandler(menu.not_menu_text() | filters.PHOTO, add_input)],
+            ADD_INPUT: [
+                CallbackQueryHandler(add_retry, pattern=r"^cretry$"),
+                MessageHandler(menu.not_menu_text() | filters.PHOTO, add_input),
+            ],
+            ADD_ENGINE: [CallbackQueryHandler(add_engine, pattern=r"^ceng:")],
             ADD_CONFIRM: [
                 CallbackQueryHandler(add_ok, pattern=r"^cok$"),
                 CallbackQueryHandler(add_edit, pattern=r"^cedit$"),
+                CallbackQueryHandler(mv_start, pattern=r"^cmv$"),
                 MessageHandler(menu.not_menu_text(), add_map),
+            ],
+            ADD_MOVE: [
+                CallbackQueryHandler(mv_dict, pattern=r"^mv:dict$"),
+                CallbackQueryHandler(mv_new, pattern=r"^mv:new$"),
+                CallbackQueryHandler(mv_skip, pattern=r"^mv:skip$"),
+                MessageHandler(menu.not_menu_text(), mv_text),
             ],
         },
         fallbacks=menu.wizard_fallbacks(),

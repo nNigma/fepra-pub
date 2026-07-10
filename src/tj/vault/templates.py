@@ -84,6 +84,7 @@ def competition_frontmatter(comp: Competition) -> tuple[dict, dict]:
     return base, owned
 
 
+# --- имена файлов ------------------------------------------------------------
 
 def daily_filename(day: date) -> str:
     return f"{day:%Y/%m}/{day.isoformat()}.md"

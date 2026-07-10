@@ -7,22 +7,23 @@ from tj.analysis.verdict import verdict
 
 
 def test_trimp_known_value():
+    # dur 60, avg 150, rest 50, max 190 -> HRr=0.714 -> ~108
     assert 105 < trimp(60, 150, 50, 190, "m") < 112
 
 
 def test_trimp_guards():
     assert trimp(None, 150, 50, 190) == 0.0
-    assert trimp(60, 150, 50, 50) == 0.0
+    assert trimp(60, 150, 50, 50) == 0.0          # max <= rest
 
 
 def test_acwr():
-    assert acwr([10] * 28) == 1.0
-    assert acwr([10] * 21 + [20] * 7) == 1.6
-    assert acwr([10] * 10) is None
+    assert acwr([10] * 28) == 1.0                  # ровная нагрузка
+    assert acwr([10] * 21 + [20] * 7) == 1.6       # острая 20 / хрон 12.5
+    assert acwr([10] * 10) is None                 # истории < 28
 
 
 def test_monotony_strain():
-    assert monotony([10, 10, 10, 10, 10, 10, 10]) is None
+    assert monotony([10, 10, 10, 10, 10, 10, 10]) is None   # std=0
     assert monotony([10, 0, 10, 0, 10, 0, 12]) > 0
     assert strain([10, 0, 10, 0, 10, 0, 12]) is not None
 
@@ -35,15 +36,15 @@ def test_epley():
 def test_benchmark_trend():
     rows = [("2026-03-01", "4:30", "rx"), ("2026-06-01", "4:12", "rx"), ("x", "AMRAP?", "rx")]
     out = benchmark_trend(rows)
-    assert out == [("2026-03-01", 270, "rx"), ("2026-06-01", 252, "rx")]
+    assert out == [("2026-03-01", 270, "rx"), ("2026-06-01", 252, "rx")]   # быстрее со временем
 
 
 def test_verdict_tiers():
-    assert verdict(85, 0.2, 0.9)["level"] == "green"
-    assert verdict(20, -3.5, 0.82)["level"] == "red"
-    assert verdict(60, -0.5, 1.0)["level"] == "amber"
-    assert verdict(80, -2.6, 0.9)["level"] == "red"
-    assert verdict(85, 0.0, 1.6)["level"] == "amber"
+    assert verdict(85, 0.2, 0.9)["level"] == "green"          # выспался, нагрузка ок
+    assert verdict(20, -3.5, 0.82)["level"] == "red"          # сегодняшний день
+    assert verdict(60, -0.5, 1.0)["level"] == "amber"         # readiness < 65
+    assert verdict(80, -2.6, 0.9)["level"] == "red"           # большой недосып перевешивает
+    assert verdict(85, 0.0, 1.6)["level"] == "amber"          # скачок ACWR -> флаг
 
 
 if __name__ == "__main__":

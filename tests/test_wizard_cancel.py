@@ -52,14 +52,14 @@ def test_cancel_wizard_clears_state_and_ends(tmp_path):
     upd, ctx = FakeUpdate(), FakeCtx(db_path=_db_path(tmp_path))
     state = asyncio.run(menu.cancel_wizard(upd, ctx))
     assert state == ConversationHandler.END
-    assert ctx.user_data == {}
-    assert upd.effective_message.replies
+    assert ctx.user_data == {}                      # состояние вычищено
+    assert upd.effective_message.replies             # показал меню
 
 
 def test_wizard_fallbacks_shape():
     fb = menu.wizard_fallbacks()
-    assert sum(isinstance(h, CommandHandler) for h in fb) == 2
-    assert sum(isinstance(h, MessageHandler) for h in fb) == 1
+    assert sum(isinstance(h, CommandHandler) for h in fb) == 2      # /cancel + /start
+    assert sum(isinstance(h, MessageHandler) for h in fb) == 1      # кнопки меню
 
 
 def test_all_wizards_have_menu_cancel_fallback():
@@ -68,5 +68,5 @@ def test_all_wizards_have_menu_cancel_fallback():
              pro.handler(), goal.handler(), record_result.handler(), garmin.handler()]
     convs += [h for h in program.handlers() if isinstance(h, ConversationHandler)]
     for c in convs:
-        assert any(isinstance(h, CommandHandler) for h in c.fallbacks)
-        assert any(isinstance(h, MessageHandler) for h in c.fallbacks)
+        assert any(isinstance(h, CommandHandler) for h in c.fallbacks)   # /cancel
+        assert any(isinstance(h, MessageHandler) for h in c.fallbacks)   # выход по кнопке

@@ -71,7 +71,7 @@ def test_board_confirm_edit_reopens_board(tmp_path):
     u = _FakeUpd("bconf:edit")
     c = _Ctx({"board_text": "WOD текст доски"}, db_path=_db_path(tmp_path))
     assert asyncio.run(rw.board_confirm(u, c)) == rw.BOARD
-    assert c.user_data.get("board_editing") is True
+    assert c.user_data.get("board_editing") is True                 # правка помечена
     assert any("WOD текст доски" in r for r in u.callback_query.message.replies)
 
 
@@ -80,8 +80,8 @@ def test_parse_lift_lines():
     assert {"movement": "становая", "weight_kg": 130.0, "reps": 1} in out
     assert {"movement": "присед", "weight_kg": 150.0, "reps": 3} in out
     movements = [o["movement"] for o in out]
-    assert "чушь" not in movements
-    assert "жим" not in movements
+    assert "чушь" not in movements          # нет числа -> пропуск
+    assert "жим" not in movements           # parse_lift отвергает 0x1
     assert len(out) == 2
 
 
@@ -90,7 +90,7 @@ def test_handler_builds_and_states():
     assert h is not None
     states = {rw.DATE, rw.DATE_INPUT, rw.SPORT, rw.UNIVERSE_ASK, rw.BOARD,
               rw.BOARD_CONFIRM, rw.RESULT, rw.MAX_CONFIRM, rw.MAX_EDIT, rw.BODYWEIGHT}
-    assert len(states) == 10
+    assert len(states) == 10         # все 10 состояний различны
 
 
 def test_handler_entry_is_add_workout():
@@ -98,7 +98,7 @@ def test_handler_entry_is_add_workout():
     h = rw.handler()
     ep = h.entry_points[0]
     assert set(ep.filters.strings) == menu.btn_variants("btn.add_workout")
-    assert rw.UNIVERSE_ASK not in h.states
+    assert rw.UNIVERSE_ASK not in h.states          # шага Universe в мастере нет
 
 
 def test_pick_sport_crossfit_goes_to_board(tmp_path):

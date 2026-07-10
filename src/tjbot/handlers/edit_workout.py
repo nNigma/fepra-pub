@@ -240,9 +240,9 @@ async def save_maxes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     parsed = None
     if vision.has_vision() and access.llm_quota_consume(update.effective_user.id):
-        parsed = vision.parse_lifts(text)
+        parsed = vision.parse_lifts(text)          # ИИ: тянет и «2 взятия…», и комплексы
     if not parsed:
-        parsed = _parse_lift_lines(text)
+        parsed = _parse_lift_lines(text)           # фолбэк: построчно (без ИИ/при лимите)
     results, ambiguous = [], []
     con = botdb.connect(context.bot_data["db_path"])
     try:

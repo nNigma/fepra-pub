@@ -24,12 +24,12 @@ def _make_event(botdb, con, *, name, tg_id, city="A", date="2026-04-12",
 def test_list_competitions():
     from tjbot import db as botdb
     con = _con()
-    eid, did = _make_event(botdb, con, name="Открытый кубок", tg_id=11111111,
-                           city="Город-А", date="2026-04-12")
-    rows = botdb.list_competitions(con, 11111111)
+    eid, did = _make_event(botdb, con, name="Кубок Владимира", tg_id=REDACTED,
+                           city="Владимир", date="2026-04-12")
+    rows = botdb.list_competitions(con, REDACTED)
     match = next((r for r in rows if r["id"] == eid), None)
     assert match is not None
-    assert match["name"] == "Открытый кубок"
+    assert match["name"] == "Кубок Владимира"
     assert match["date_start"] == "2026-04-12"
     assert match["division_id"] == did
     con.close()
@@ -138,12 +138,12 @@ def test_list_other_competitions_has_division_id():
 
 def test_format_other_view_renders_event_and_stages():
     from tjbot.handlers.competition import _format_other_view
-    full = {"name": "Кубок", "city": "Город-А", "date_start": "2026-04-12",
+    full = {"name": "Кубок", "city": "Владимир", "date_start": "2026-04-12",
             "divisions": [{"id": 1, "name": "PRO"}, {"id": 2, "name": "RX"}]}
     stages_by_div = {1: [{"idx": 1, "name": "Fran"}, {"idx": 2, "name": "Grace"}], 2: []}
     text = _format_other_view(full, stages_by_div)
     assert "Кубок" in text
-    assert "Город-А" in text
+    assert "Владимир" in text
     assert "2026-04-12" in text
     assert "PRO" in text and "RX" in text
     assert "Fran" in text and "Grace" in text

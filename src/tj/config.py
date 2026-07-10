@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomllib  # py3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
 
 
 def _expand(p: str) -> Path:
@@ -52,13 +52,16 @@ def load_dotenv(path: str | os.PathLike = ".env") -> dict[str, str]:
     return env
 
 
+# Источники кредов по убыванию приоритета: проектный .env -> общий секрет-стор rr.
 _ENV_CANDIDATES = (
     ".env",
+    "$RR_ROOT/.env",
+    "~/REDACTED/rr/.env",
 )
 
 
 def default_env_path() -> Path:
-    """Первый существующий env-файл (проектный .env)."""
+    """Первый существующий env-файл: проектный .env, иначе общий rr/.env."""
     for c in _ENV_CANDIDATES:
         p = _expand(c)
         if p.exists():
@@ -70,7 +73,7 @@ def default_env_path() -> Path:
 class GarminCreds:
     email: str
     password: str
-    tokenstore: str
+    tokenstore: str          # директория хранения OAuth-токена (garth.dump)
 
 
 def garmin_creds(env: dict[str, str]) -> GarminCreds:

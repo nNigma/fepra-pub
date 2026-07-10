@@ -11,7 +11,7 @@ def test_main_kb_clean_for_regular(monkeypatch):
     t = _texts(menu.main_kb(2, "ru"))
     assert "➕ Результат" not in t and "🎯 Цель" not in t and "Pro" not in t
     assert "👑 Admin" not in t
-    assert "Программа зала" in t
+    assert "Программа зала" in t              # B: просмотр доступен всем
     assert "Записать тренировку" in t and "📊 Аналитика" in t
     assert "Соревнования" in t
     assert "Питание" in t and "Профиль" in t
@@ -26,11 +26,10 @@ def test_main_kb_admin_extras(monkeypatch):
     assert menu.BTN_ADMIN == "👑 Admin" and menu.BTN_BACK == "← Назад"
 
 
-def test_main_kb_sections(monkeypatch):
-    monkeypatch.setattr(menu, "is_admin", lambda tg: True)
+def test_main_kb_sections():
     from tjbot.handlers.menu import (main_kb, BTN_ANALYTICS, BTN_RECORD,
                                      BTN_CLUB_SECTION, BTN_COMP_SECTION, BTN_ADMIN)
-    texts = [b.text for row in main_kb(11111111, "ru").keyboard for b in row]
+    texts = [b.text for row in main_kb(REDACTED, "ru").keyboard for b in row]
     for t in (BTN_ANALYTICS, BTN_RECORD, "Программа зала", BTN_COMP_SECTION,
               "Питание", "Профиль", BTN_ADMIN):
         assert t in texts, t

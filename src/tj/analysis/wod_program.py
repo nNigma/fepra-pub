@@ -13,7 +13,7 @@ _BULLET = re.compile(r"^\s*[-•*–]\s*")
 _LEAD_NUM = re.compile(r"^\s*\d+\s*[).:]?\s*")
 _MOVE_QTY = re.compile(r"^\s*(?:[-•*–]\s*)?\d+\s*(?:(?:мин|кал|сек|м)(?=[\s.]|$))?\.?\s*")
 
-_SEC_WARMUP = re.compile(r"размин|разогрев|актив|суставн|мобильн|warm", re.IGNORECASE)
+_SEC_WARMUP = re.compile(r"размин|разогрев|актив|суставн|мобильн|общ|warm", re.IGNORECASE)
 _SEC_METCON = re.compile(r"комплекс|метком|меткон|кондиц|\bwod\b|metcon", re.IGNORECASE)
 _SEC_STRENGTH = re.compile(r"\bсил|strength|\bта\b|тяж\w*\s*атлет", re.IGNORECASE)
 _REST_LINE = re.compile(r"отд[ыий]х|\brest\b", re.IGNORECASE)
@@ -72,22 +72,23 @@ def _format_for(header_line: str, notation: dict | None) -> str:
 
 def _movement(name: str, aliases):
     name = name.strip()
-    canon = ontology.resolve(name, aliases)
-    if not canon:
-        found = ontology.find(name, aliases)
-        canon = found[-1] if found else None
-    return {"name": name, "canon": canon, "weighted": ontology.is_weighted(canon)}
+    found = ontology.find(name, aliases)
+    canon = ontology.resolve(name, aliases) or (found[-1] if found else None)
+    # все каноны строки (напр. «50 ДП или 75 ОП» -> double_under + single_under)
+    canons = list(dict.fromkeys(([canon] if canon else []) + found))
+    return {"name": name, "canon": canon, "canons": canons,
+            "weighted": ontology.is_weighted(canon)}
 
 
 def parse_program(text: str, aliases: dict | None = None, sex: str = "m") -> list[dict]:
     blocks: list[dict] = []
     cur = None
     warmup = False
-    section = None
+    section = None            # 'warmup' | 'strength' | 'metcon' | None
     section_title = None
     section_idx = 0
-    strength_notation = None
-    strength_move = None
+    strength_notation = None  # EMOM ждёт движение (нотация раньше движения)
+    strength_move = None      # движение ждёт EMOM (движение раньше нотации)
 
     def close():
         nonlocal cur
@@ -151,7 +152,7 @@ def parse_program(text: str, aliases: dict | None = None, sex: str = "m") -> lis
 
         if notation and notation.get("rounds"):
             section_idx += 1
-            hdr = f"{section_title} {section_idx}" if section == "metcon" else (section_title or "WOD")
+            hdr = f"{section_title} {section_idx}" if section == "metcon" else "WOD"
             open_block(hdr, "for_time", rounds=notation["rounds"], has_cap=N.has_cap(line))
             continue
 
@@ -181,10 +182,13 @@ def movements_of(blocks):
     canon, unknown = [], []
     for b in blocks or []:
         for m in b.get("movements", []):
-            c = m.get("canon")
-            if c:
-                if c not in canon:
-                    canon.append(c)
+            cs = m.get("canons")
+            if cs is None:
+                cs = [m["canon"]] if m.get("canon") else []
+            if cs:
+                for c in cs:
+                    if c and c not in canon:
+                        canon.append(c)
             else:
                 nm = (m.get("name") or "").strip()
                 if nm and nm not in unknown:

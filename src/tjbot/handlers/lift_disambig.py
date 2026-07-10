@@ -11,6 +11,7 @@ from tj import i18n
 from tj.analysis import standards
 from .. import db as botdb
 
+# family -> [(discipline_id, i18n_label_key)] — порядок кнопок
 FAMILY_VARIANTS = {
     "snatch": [("squat_snatch", "disambig.snatch_squat"), ("power_snatch", "disambig.snatch_power")],
     "clean": [("clean_floor", "disambig.clean_floor"), ("hang_clean", "disambig.clean_hang")],

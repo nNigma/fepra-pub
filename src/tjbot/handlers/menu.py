@@ -34,15 +34,17 @@ BTN_LEADERBOARD = "🏆 Лидерборд"
 BTN_LANG_RU = "🇷🇺 Русский"
 BTN_LANG_EN = "🇬🇧 English"
 
+# Все тексты кнопок-меню (главное меню + под-меню зала/админа). Нужны, чтобы любой
+# мастер (ConversationHandler) отпускал юзера: нажатие кнопки меню = выход из мастера.
 MENU_BUTTONS = frozenset({
     BTN_RECORD, BTN_EDIT, BTN_COMP, BTN_ADMIN, BTN_BACK,
     "Программа зала", "Тренировки", "Сводка", "Соревнования", "Цели", "Питание", "Профиль",
-    "📅 На дату", "📊 Стата зала", "➕ Добавить",
-    "➕ Добавить в бота", "➖ Удалить из бота", "Pro", "📊 Статистика",
+    "📅 На дату", "📊 Стата зала", "➕ Добавить",           # под-меню «Программа зала»
+    "➕ Добавить в бота", "➖ Удалить из бота", "Pro", "📊 Статистика",  # под-меню «Admin»
     BTN_ANALYTICS, BTN_ADD_RESULT, BTN_ADD_WORKOUT, BTN_COMP_SUMMARY, BTN_LEADERBOARD,
     "✏️ Редактировать программу", "📝 Наполнить соревнование", "🎯 Цель",
     "Сегодня", "Вчера", "Другая дата", BTN_FEEL,
-    BTN_LANG_RU, BTN_LANG_EN,
+    BTN_LANG_RU, BTN_LANG_EN,                               # под-меню «Выбор языка»
 })
 
 _MENU_KEYS = [
@@ -51,6 +53,7 @@ _MENU_KEYS = [
     "btn.admin", "btn.edit", "btn.comp", "btn.add_result", "btn.add_workout",
     "btn.comp_summary", "btn.leaderboard", "btn.result", "btn.comp_fill",
     "btn.svodka", "btn.trenirovki", "btn.tseli", "btn.goal_single", "btn.feel",
+    "btn.coach",
     "btn.club_date", "btn.club_add", "btn.club_edit", "btn.club_stats",
     "btn.admin_add_user", "btn.admin_del_user", "btn.pro", "btn.admin_stats",
 ]
@@ -96,7 +99,7 @@ def wizard_fallbacks(*extra, cancel=None):
 
 def analytics_kb(lang: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        [[i18n.t("btn.trenirovki", lang), i18n.t("btn.svodka", lang)],
+        [[i18n.t("btn.svodka", lang), i18n.t("btn.trenirovki", lang)],
          [i18n.t("btn.comp_summary", lang), i18n.t("btn.tseli", lang)],
          [i18n.t("btn.leaderboard", lang)], [i18n.t("btn.back", lang)]],
         resize_keyboard=True)
@@ -135,8 +138,8 @@ def main_kb(tg_id: int, lang: str) -> ReplyKeyboardMarkup:
     rows = [[i18n.t("btn.analytics", lang), i18n.t("btn.record", lang)],
             [i18n.t("btn.club_section", lang), i18n.t("btn.comp_section", lang)],
             [i18n.t("btn.goal_single", lang), i18n.t("btn.feel", lang)],
-            [i18n.t("btn.nutrition", lang), i18n.t("btn.profile", lang)],
-            [i18n.t("btn.lang", lang)]]
+            [i18n.t("btn.nutrition", lang), i18n.t("btn.coach", lang)],
+            [i18n.t("btn.profile", lang), i18n.t("btn.lang", lang)]]
     if is_admin(tg_id):
         rows.append([i18n.t("btn.admin", lang)])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -220,6 +223,8 @@ async def _profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     acc = botdb.garmin_account_get(con, uid)
     lang = botdb.user_lang(con, uid)
     astro = botdb.user_astro(con, uid)
+    goal = botdb.user_goal(con, uid)
+    city = botdb.user_city(con, uid)
     con.close()
     if not u:
         await update.effective_message.reply_text(i18n.t("profile.not_filled", lang))
@@ -227,10 +232,12 @@ async def _profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = i18n.t("profile.card", lang, nick=u["nick"], height=u["height_cm"],
                    weight=u["weight_kg"], sex=u["sex"], age=u["age"], gym=u["gym"],
                    last=last or "—")
-    await update.effective_message.reply_text(text, reply_markup=_profile_kb(lang, bool(acc), astro))
+    await update.effective_message.reply_text(
+        text, reply_markup=_profile_kb(lang, bool(acc), astro, goal, city))
 
 
-def _profile_kb(lang: str, has_acc: bool, astro: bool) -> InlineKeyboardMarkup:
+def _profile_kb(lang: str, has_acc: bool, astro: bool, goal: str = "maintain",
+                city: str = "Москва") -> InlineKeyboardMarkup:
     rows = []
     if has_acc:
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_sync", lang), callback_data="gsync")],
@@ -238,6 +245,12 @@ def _profile_kb(lang: str, has_acc: bool, astro: bool) -> InlineKeyboardMarkup:
                  [InlineKeyboardButton(i18n.t("profile.btn_disconnect", lang), callback_data="gdisc")]]
     else:
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_connect", lang), callback_data="gconnect")]]
+    rows.append([InlineKeyboardButton(i18n.t("profile.btn_bodyweight", lang), callback_data="bw:start")])
+    rows.append([InlineKeyboardButton(
+        i18n.t("profile.btn_goal", lang, goal=i18n.t(f"goal.{goal}", lang)),
+        callback_data="ngoal:open")])
+    rows.append([InlineKeyboardButton(
+        i18n.t("profile.btn_city", lang, city=city), callback_data="ncity:open")])
     astro_key = "profile.btn_astro_on" if astro else "profile.btn_astro_off"
     rows.append([InlineKeyboardButton(i18n.t(astro_key, lang), callback_data="astro:toggle")])
     return InlineKeyboardMarkup(rows)
@@ -254,10 +267,12 @@ async def astro_toggle_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         new = not botdb.user_astro(con, uid)
         botdb.set_astro(con, uid, new)
         acc = botdb.garmin_account_get(con, uid)
+        goal = botdb.user_goal(con, uid)
+        city = botdb.user_city(con, uid)
     finally:
         con.close()
     await q.answer(i18n.t("profile.astro_on" if new else "profile.astro_off", lang))
-    await q.edit_message_reply_markup(reply_markup=_profile_kb(lang, bool(acc), new))
+    await q.edit_message_reply_markup(reply_markup=_profile_kb(lang, bool(acc), new, goal, city))
 
 
 @restricted
@@ -371,6 +386,11 @@ async def _leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await _open_app(update, context, "leaderboard", "app.open_leaderboard_btn", "app.open_leaderboard_intro")
 
 
+@restricted
+async def _nutrition(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _open_app(update, context, "nutrition", "app.open_nutrition_btn", "app.open_nutrition_intro")
+
+
 def register_stubs(app) -> None:
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.record")), open_record))
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.analytics")), open_analytics))
@@ -379,7 +399,7 @@ def register_stubs(app) -> None:
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.comp_summary")), _sorevnovaniya))
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.tseli")), _tseli))
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.leaderboard")), _leaderboard))
-    app.add_handler(MessageHandler(filters.Text(btn_variants("btn.nutrition")), _dev_stub))
+    app.add_handler(MessageHandler(filters.Text(btn_variants("btn.nutrition")), _nutrition))
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.profile")), _profile))
     app.add_handler(MessageHandler(filters.Text(btn_variants("btn.lang")), _open_lang))
     app.add_handler(MessageHandler(filters.Text([BTN_LANG_RU, BTN_LANG_EN]), _pick_lang))

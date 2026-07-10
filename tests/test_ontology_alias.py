@@ -11,7 +11,7 @@ def test_resolve_static_unchanged():
 def test_resolve_with_runtime_aliases():
     al = {"присед на ящик": "back_squat"}
     assert resolve("присед на ящик", al) == "back_squat"
-    assert resolve("становая", al) == "deadlift"
+    assert resolve("становая", al) == "deadlift"   # статика всё ещё работает
 
 
 def test_resolve_alias_takes_priority():

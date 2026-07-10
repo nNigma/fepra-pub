@@ -10,23 +10,23 @@ def _con():
 
 def test_create_event_division_participant():
     con = _con()
-    eid = botdb.create_event(con, name="Открытый кубок", city="Город-А",
+    eid = botdb.create_event(con, name="Кубок Владимира", city="Владимир",
                              date_start="2026-04-12", date_end="2026-04-12",
-                             sport="crossfit", fmt="6 этапов", created_by=11111111)
+                             sport="crossfit", fmt="6 этапов", created_by=REDACTED)
     did = botdb.add_division(con, eid, name="PRO", field_size=22)
-    pid = botdb.add_participant(con, did, tg_id=11111111, athlete="Я")
+    pid = botdb.add_participant(con, did, tg_id=REDACTED, athlete="Я")
     assert eid > 0 and did > 0 and pid > 0
     ev = botdb.get_event(con, eid)
-    assert ev["name"] == "Открытый кубок"
+    assert ev["name"] == "Кубок Владимира"
     assert ev["divisions"][0]["name"] == "PRO"
 
 
 def test_find_by_city_date_and_stage_results():
     con = _con()
-    eid = botdb.create_event(con, name="Открытый кубок", city="Город-А",
+    eid = botdb.create_event(con, name="Кубок Владимира", city="Владимир",
         date_start="2026-04-12", date_end="2026-04-12", sport="crossfit", fmt="", created_by=1)
     did = botdb.add_division(con, eid, name="PRO", field_size=22)
-    found = botdb.find_events_by_city_date(con, city="город-а", date="2026-04-12")
+    found = botdb.find_events_by_city_date(con, city="владимир", date="2026-04-12")
     assert len(found) == 1 and found[0]["id"] == eid
     sid = botdb.add_stage(con, did, idx=1, name="Гребля+бег", prescription="...",
                           movements=["гребля", "бег"], fmt="text")
@@ -70,7 +70,7 @@ def test_percentile_and_capacities():
     ]
     caps = capacity_grades(stages)
     assert all(1 <= g <= 9 for g in caps.values())
-    assert "Движок" in caps
+    assert "Движок" in caps  # гребля/бег → Движок
 
 
 def test_capacity_full_mapping():
@@ -103,11 +103,11 @@ def test_scenario_and_bestworst():
 def test_totals_by_start_sorted():
     from tj.analysis.competitions import totals_by_start
     events = [
-        {"date_start": "2026-04-12", "name": "Город-А", "final_place": 6, "field_size": 22},
-        {"date_start": "2026-02-02", "name": "Город-Б", "final_place": 11, "field_size": 18},
+        {"date_start": "2026-04-12", "name": "Владимир", "final_place": 6, "field_size": 22},
+        {"date_start": "2026-02-02", "name": "Красногорск", "final_place": 11, "field_size": 18},
     ]
     rows = totals_by_start(events)
-    assert [r["name"] for r in rows] == ["Город-Б", "Город-А"]
+    assert [r["name"] for r in rows] == ["Красногорск", "Владимир"]
     assert rows[0]["final_place"] == 11
 
 def test_comp_blocks():
@@ -124,7 +124,7 @@ def test_comp_blocks():
 def test_event_report_shape():
     from tj.analysis.competitions import event_report
     con = _con()
-    eid = botdb.create_event(con, name="Город-А", city="Город-А", date_start="2026-04-12",
+    eid = botdb.create_event(con, name="Владимир", city="Владимир", date_start="2026-04-12",
         date_end="2026-04-12", sport="crossfit", fmt="", created_by=1)
     did = botdb.add_division(con, eid, name="PRO", field_size=22)
     botdb.add_participant(con, did, tg_id=1, athlete="Я")
@@ -133,11 +133,11 @@ def test_event_report_shape():
         botdb.add_comp_result(con, sid, athlete="Я", value="x", place=pl, points=pl)
     rep = event_report(con, eid, tg_id=1)
     assert "radar" in rep and "dynamics" in rep and "narrative" in rep
-    assert rep["name"] == "Город-А"
+    assert rep["name"] == "Владимир"
 
 def test_total_report_rows_have_id():
     con = _con()
-    eid = botdb.create_event(con, name="Город-А", city="Город-А", date_start="2026-04-12",
+    eid = botdb.create_event(con, name="Владимир", city="Владимир", date_start="2026-04-12",
         date_end="2026-04-12", sport="crossfit", fmt="", created_by=1)
     did = botdb.add_division(con, eid, name="PRO", field_size=22)
     botdb.add_participant(con, did, tg_id=1, athlete="Я")
@@ -161,13 +161,13 @@ def _make_event_with_stages(con, name, city, date, field, stages_data, tg_id):
 def test_total_report_enriched_one_event():
     from tj.analysis.competitions import total_report
     con = _con()
-    _make_event_with_stages(con, "Город-А", "Город-А", "2026-04-12", 22,
+    _make_event_with_stages(con, "Владимир", "Владимир", "2026-04-12", 22,
         [("Гребля", ["гребля"], 4), ("Рывок", ["рывок"], 14)], tg_id=1)
     tr = total_report(con, 1)
     assert tr["starts"] == 1
     assert isinstance(tr["radars"], list) and len(tr["radars"]) == 1
     r = tr["radars"][0]
-    assert r["name"] == "Город-А"
+    assert r["name"] == "Владимир"
     assert r["date"] == "2026-04-12"
     assert isinstance(r["grades"], dict) and len(r["grades"]) > 0
     assert all(1 <= v <= 9 for v in r["grades"].values())
@@ -180,14 +180,14 @@ def test_total_report_enriched_one_event():
 def test_total_report_enriched_two_events():
     from tj.analysis.competitions import total_report
     con = _con()
-    _make_event_with_stages(con, "Город-Б", "Город-Б", "2026-02-02", 18,
+    _make_event_with_stages(con, "Красногорск", "Красногорск", "2026-02-02", 18,
         [("Гребля+бег", ["гребля", "бег"], 5), ("Оверхед", ["оверхед"], 17)], tg_id=2)
-    _make_event_with_stages(con, "Город-А", "Город-А", "2026-04-12", 22,
+    _make_event_with_stages(con, "Владимир", "Владимир", "2026-04-12", 22,
         [("Бассейн", ["плавание"], 4), ("Рывок", ["рывок"], 14)], tg_id=2)
     tr = total_report(con, 2)
     assert tr["starts"] == 2
     assert len(tr["radars"]) == 2
-    assert tr["radars"][0]["name"] == "Город-А"
+    assert tr["radars"][0]["name"] == "Владимир"
     bw = tr["best_worst"]
     assert len(bw["best"]) >= 1 and len(bw["worst"]) >= 1
     assert "Бассейн" in bw["best"][0]["name"] or "Гребля+бег" in bw["best"][0]["name"]
