@@ -250,14 +250,49 @@ def claude_vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/j
             return _claude_run(full, td, timeout, "claude_vision", model=model)
 
 
+def _anthropic_key() -> str | None:
+    from tj import config as cfgmod
+    env = cfgmod.load_dotenv(cfgmod.default_env_path())
+    return _pick_key(env, "ANTHROPIC_API_KEY")
+
+
+def _anthropic_complete(prompt: str, *, timeout: float = 150.0,
+                        max_tokens: int = 4096) -> str | None:
+    """Текст через Anthropic Messages API (когда есть ключ, но нет CLI). Модель —
+    ANTHROPIC_MODEL или дефолт. Любой сбой -> None (звонящий фолбэчит на Gemini)."""
+    key = _anthropic_key()
+    if not key:
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        print("[llm] anthropic SDK не установлен (pip install '.[claude]')", flush=True)
+        return None
+    model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+    try:
+        client = anthropic.Anthropic(api_key=key, timeout=timeout)
+        msg = client.messages.create(
+            model=model, max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}])
+        text = "".join(getattr(b, "text", "") for b in msg.content
+                       if getattr(b, "type", None) == "text").strip()
+        print(f"[llm] anthropic_api model={model} ok", flush=True)
+        return text or None
+    except Exception as e:
+        print(f"[llm] anthropic_api error: {type(e).__name__}", flush=True)
+        return None
+
+
 def claude_complete(prompt: str, *, timeout: float = 150.0) -> str | None:
-    """Текстовая задача через `claude -p` (без фото). cwd = пустая временная
-    папка (изоляция от CLAUDE.md и файлов). Сбой -> None, звонящий фолбэчит."""
+    """Текстовая задача: CLI по подписке -> API-ключ -> None. cwd CLI = пустая
+    временная папка (изоляция от CLAUDE.md). Сбой всех -> None, звонящий фолбэчит."""
     from tj.config import claude_enabled
     if not claude_enabled():
         return None
-    if not _claude_bin():
-        return None
-    with _claude_guard():
-        with tempfile.TemporaryDirectory(prefix="tj-text-") as td:
-            return _claude_run(prompt, td, timeout, "claude_complete")
+    if _claude_bin():
+        with _claude_guard():
+            with tempfile.TemporaryDirectory(prefix="tj-text-") as td:
+                text = _claude_run(prompt, td, timeout, "claude_complete")
+        if text:
+            return text
+    return _anthropic_complete(prompt, timeout=timeout)

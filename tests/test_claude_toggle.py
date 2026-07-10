@@ -72,3 +72,20 @@ def test_has_claude_vision_on_with_bin(monkeypatch):
     monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
     monkeypatch.setattr(llm, "_claude_bin", lambda: "/x/claude")
     assert llm.has_claude_vision() is True
+
+
+def test_claude_complete_uses_api_when_no_cli(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setattr(llm, "_claude_bin", lambda: None)          # CLI нет
+    monkeypatch.setattr(llm, "_anthropic_complete",
+                        lambda prompt, **k: "API-ответ")
+    assert llm.claude_complete("вопрос") == "API-ответ"
+
+
+def test_claude_complete_prefers_cli_over_api(monkeypatch):
+    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setattr(llm, "_claude_bin", lambda: "/x/claude")
+    monkeypatch.setattr(llm, "_claude_run", lambda *a, **k: "CLI-ответ")
+    monkeypatch.setattr(llm, "_anthropic_complete",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("API не должен вызываться")))
+    assert llm.claude_complete("вопрос") == "CLI-ответ"
