@@ -31,7 +31,9 @@ def test_start_override_pulls_full_range(tmp_path, monkeypatch):
     monkeypatch.setattr(garmin_sync, "dump_hr_series", lambda *a, **k: None)
     res = garmin_sync.sync_recent(p, tg_id=1, tokenstore="/tmp/ts",
                                   upto=date(2026, 7, 6), start=date(2026, 7, 1))
-    assert ad.daily_days == [date(2026, 7, d) for d in range(1, 7)]
+    # основной цикл тянет полный диапазон (первые 6 фетчей); дальше heal может
+    # перечитать частичные дни (только resting_hr, без сна) — это ожидаемо
+    assert ad.daily_days[:6] == [date(2026, 7, d) for d in range(1, 7)]
     assert res["days"] == 6
     assert res["from"] == "2026-07-01"
 
@@ -94,7 +96,8 @@ def test_profile_no_history_button_without_garmin(tmp_path):
     msg = _FakeMsg()
     asyncio.run(menu._profile.__wrapped__(_FakeUpdate(6, msg), _FakeCtx(p)))
     assert _callbacks(msg.markup) == {"gconnect", "bw:start", "astro:toggle",
-                                       "ngoal:open", "ncity:open"}
+                                       "ngoal:open", "ncity:open", "wconnect:samsung",
+                                       "wconnect:whoop"}
 
 
 def test_history_is_idempotent(tmp_path, monkeypatch):

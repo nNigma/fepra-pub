@@ -22,6 +22,31 @@ def test_sync_writes_under_tg_id(tmp_path, monkeypatch):
     assert con.execute('SELECT tg_id FROM daily').fetchone()[0] == 222
     assert con.execute('SELECT tg_id FROM activities').fetchone()[0] == 222
 
+def test_heal_partial_sleep_day(tmp_path):
+    import json
+    p = tmp_path / "t.db"; con = botdb.connect(p); botdb.init_schema(con)
+    # частичный день (как 07-11 на проде): есть непрерывные метрики, НЕТ сна/HRV/готовности
+    con.execute('INSERT INTO daily ("day","resting_hr","body_battery","stress_avg","extra","tg_id") '
+                'VALUES (?,?,?,?,?,?)',
+                ("2026-07-11", 47, 29, 21, json.dumps({"spo2_avg": 95}), 1))
+    con.commit()
+
+    class _Full:
+        def fetch_daily(self, d):
+            return DailyMetrics(day=d, sleep_h=7.5, resting_hr=47, hrv=60,
+                                body_battery=80, readiness=66, stress_avg=21,
+                                extra={"sleep_score": 82, "hrv_status": "balanced"})
+
+    n = garmin_sync._heal_missing_daily(con, botdb, _Full(), 1,
+                                        date(2026, 7, 4), date(2026, 7, 11))
+    assert n == 1
+    r = con.execute('SELECT sleep_h,hrv,readiness,extra FROM daily WHERE tg_id=1 AND day=?',
+                    ("2026-07-11",)).fetchone()
+    assert (r[0], r[1], r[2]) == (7.5, 60, 66)
+    assert json.loads(r[3]).get("sleep_score") == 82   # extra тоже дозаполнился
+    con.close()
+
+
 def test_hr_filename_has_tg_id(tmp_path):
     class C:
         def get_activity_details(self, *a, **k):

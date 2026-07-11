@@ -97,22 +97,23 @@ def last_watch_date(con, tg_id) -> str | None:
 
 
 def _heal_missing_daily(con, botdb, ad, tg_id, since: date, until: date) -> int:
+    # Дни с пропущенными метриками СНА (сон/HRV/готовность приходят из Garmin позже
+    # непрерывных). Ловим и ЧАСТИЧНЫЕ дни (напр. есть resting_hr, но нет сна) — иначе
+    # утренний синк до финализации сна оставляет день навсегда без готовности.
     rows = con.execute(
         'SELECT "day" FROM daily WHERE "tg_id"=? AND "day" BETWEEN ? AND ? '
-        'AND "readiness" IS NULL AND "hrv" IS NULL AND "resting_hr" IS NULL '
-        'AND "sleep_h" IS NULL ORDER BY "day"',
+        'AND ("readiness" IS NULL OR "hrv" IS NULL OR "sleep_h" IS NULL) ORDER BY "day"',
         (tg_id, since.isoformat(), until.isoformat())).fetchall()
     healed = 0
     for r in rows:
         m = ad.fetch_daily(date.fromisoformat(r["day"]))
-        if not m or not any(v is not None for v in
-                            (m.readiness, m.hrv, m.resting_hr, m.sleep_h)):
-            continue
+        if not m or not any(v is not None for v in (m.readiness, m.hrv, m.sleep_h)):
+            continue                       # сон ещё не готов у Garmin — не трогаем
         con.execute(
             'UPDATE daily SET "sleep_h"=?, "resting_hr"=?, "hrv"=?, "body_battery"=?, '
-            '"readiness"=?, "stress_avg"=? WHERE "tg_id"=? AND "day"=?',
+            '"readiness"=?, "stress_avg"=?, "extra"=? WHERE "tg_id"=? AND "day"=?',
             (m.sleep_h, m.resting_hr, m.hrv, m.body_battery, m.readiness,
-             m.stress_avg, tg_id, r["day"]))
+             m.stress_avg, json.dumps(m.extra or {}, ensure_ascii=False), tg_id, r["day"]))
         healed += 1
     if healed:
         con.commit()
