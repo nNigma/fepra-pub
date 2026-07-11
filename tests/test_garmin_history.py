@@ -96,8 +96,7 @@ def test_profile_no_history_button_without_garmin(tmp_path):
     msg = _FakeMsg()
     asyncio.run(menu._profile.__wrapped__(_FakeUpdate(6, msg), _FakeCtx(p)))
     assert _callbacks(msg.markup) == {"gconnect", "bw:start", "astro:toggle",
-                                       "ngoal:open", "ncity:open", "wconnect:samsung",
-                                       "wconnect:whoop"}
+                                       "ngoal:open", "ncity:open"}
 
 
 def test_history_is_idempotent(tmp_path, monkeypatch):
