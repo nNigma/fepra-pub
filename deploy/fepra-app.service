@@ -1,17 +1,17 @@
 # systemd unit for the FastAPI Mini App (uvicorn).
-# Copy to /etc/systemd/system/kuznitsa-app.service, adjust paths, then:
-#   systemctl daemon-reload && systemctl enable --now kuznitsa-app
+# Copy to /etc/systemd/system/fepra-app.service, adjust paths, then:
+#   systemctl daemon-reload && systemctl enable --now fepra-app
 [Unit]
-Description=Kuznitsa Mini App (FastAPI/uvicorn)
+Description=FePra Mini App (FastAPI/uvicorn)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/kuznitsa
+WorkingDirectory=/opt/fepra
 Environment=PYTHONPATH=src
 Environment=TJAPP_PORT=8010
-ExecStart=/opt/kuznitsa/.venv/bin/python -m tjapp.server
+ExecStart=/opt/fepra/.venv/bin/python -m tjapp.server
 Restart=always
 RestartSec=5
 

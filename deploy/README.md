@@ -1,6 +1,6 @@
 # Deploy
 
-Kuznitsa runs as two long-lived processes — the Telegram bot (polling) and the
+FePra runs as two long-lived processes — the Telegram bot (polling) and the
 FastAPI Mini App (uvicorn) — behind a reverse proxy that terminates HTTPS.
 
 > Important: the Gemini API is blocked from some regions (RU among them).
@@ -17,8 +17,8 @@ Open ports 22, 80, 443.
 # uv (Python package/venv manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-git clone <your-fork-url> /opt/kuznitsa
-cd /opt/kuznitsa
+git clone <your-fork-url> /opt/fepra
+cd /opt/fepra
 uv venv --python 3.12
 uv pip install -e '.[bot]'          # Gemini-only (default)
 # uv pip install -e '.[bot,claude]' # only if you set use_claude = true with an API key
@@ -28,7 +28,7 @@ uv pip install -e '.[bot]'          # Gemini-only (default)
 
 ```bash
 cp .env.example .env
-# fill in TG_KUZ_BOT_TOKEN, OWNER_TG_ID, GEMINI_API_KEY, MINIAPP_URL, ... (see .env.example)
+# fill in TG_FEPRA_BOT_TOKEN, OWNER_TG_ID, GEMINI_API_KEY, MINIAPP_URL, ... (see .env.example)
 ```
 
 `config.toml [llm].use_claude` defaults to `false` (Gemini-only) — leave it as is
@@ -53,14 +53,14 @@ Caddy fetches a Let's Encrypt certificate automatically and proxies to
 ## 5. Services
 
 ```bash
-cp deploy/kuznitsa-bot.service /etc/systemd/system/
-cp deploy/kuznitsa-app.service /etc/systemd/system/
+cp deploy/fepra-bot.service /etc/systemd/system/
+cp deploy/fepra-app.service /etc/systemd/system/
 # edit WorkingDirectory / paths / MINIAPP_URL in both, then:
 systemctl daemon-reload
-systemctl enable --now kuznitsa-bot kuznitsa-app
+systemctl enable --now fepra-bot fepra-app
 ```
 
-Logs: `journalctl -u kuznitsa-bot -f` (or `kuznitsa-app`).
+Logs: `journalctl -u fepra-bot -f` (or `fepra-app`).
 
 ## 6. Updating
 
@@ -68,8 +68,8 @@ Pull new code and restart — runtime data (`training.db`, `.env`, tokens) is
 never touched by a code update:
 
 ```bash
-cd /opt/kuznitsa && git pull
-systemctl restart kuznitsa-bot kuznitsa-app
+cd /opt/fepra && git pull
+systemctl restart fepra-bot fepra-app
 ```
 
 After changing `tjapp/static/*`, bump the `?v=` query on `app.js` in

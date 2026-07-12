@@ -1,4 +1,4 @@
-# «Кузница» (training-journal) — спецификация
+# FePra — спецификация
 
 > Личный тренировочный сервис с активным анализом. Основной спорт — кроссфит,
 > плюс бег / вело. Ввод — Telegram-бот, отчёты — Mini App, источник правды —
@@ -51,7 +51,7 @@ tjapp/  FastAPI Mini App — слой ОТЧЁТОВ (REST + статика; в�
 ```
 
 Бот пишет в `training.db`, Mini App читает из неё через `tj.analysis.*`. «Разбор от
-Месье Клода» пишет отдельный скилл `kuznitsa-claude-review` (вне репо).
+Месье Клода» пишет отдельный скилл `fepra-claude-review` (вне репо).
 
 ## 5. Каноническая схема
 
@@ -101,7 +101,7 @@ Vendor-agnostic сущности (`tj/models.py`), таблицы — в `tjbot/
 - **Gemini** (`tj/llm.py`, `tj/analysis/llm_coach.py`) — быстрый разбор по тапу
   «Разобрать ИИ». Текст — бесплатный ключ, vision (фото) — платный. Модель
   `gemini-2.5-flash`, thinking off. Работает только с не-РФ IP (см. §13).
-- **Claude** — глубокий «🎩 Разбор от Месье Клода», пишет скилл `kuznitsa-claude-review`
+- **Claude** — глубокий «🎩 Разбор от Месье Клода», пишет скилл `fepra-claude-review`
   offline; перекрывает Gemini-разбор за день.
 - **Гейтинг:** текстовый разбор Pro-only; суточный лимит вызовов; кэш по хешу payload
   (+ язык, + флаг гадания). Vision-OCR — без Pro (помощник ввода).
@@ -135,10 +135,10 @@ Vendor-agnostic сущности (`tj/models.py`), таблицы — в `tjbot/
 ## 13. Деплой
 
 Прод — сервер вне РФ (**Gemini API не ходит с росс. IP**). systemd-юниты
-`kuznitsa-bot` + `kuznitsa-app`, реверс-прокси **Caddy** (Let's Encrypt) на
+`fepra-bot` + `fepra-app`, реверс-прокси **Caddy** (Let's Encrypt) на
 твоём домене (например `<your>.duckdns.org`), Mini App на `:8010`. Деплой = `rsync src/` + рестарт сервисов;
 данные сервера (`training.db`, `.env`, токены) не перезаписываются; миграции схемы —
-идемпотентно в `init_schema`. Бэкап БД — скилл `kuz-ops` (pull-only на мак).
+идемпотентно в `init_schema`. Бэкап БД — pull-only снимок с сервера.
 
 ## 14. Legacy: Obsidian/CLI-слой
 

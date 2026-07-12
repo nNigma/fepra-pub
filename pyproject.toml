@@ -1,7 +1,7 @@
 [project]
 name = "training-journal"
 version = "0.1.0"
-description = "Кузница — дневник кроссфита: Telegram-бот + Mini App, биодата Garmin + LLM-разбор"
+description = "FePra — дневник кроссфита: Telegram-бот + Mini App, биодата Garmin + LLM-разбор"
 requires-python = ">=3.12"   # garminconnect 0.3.x требует 3.12
 dependencies = [
     "garminconnect>=0.3",   # неофициальный доступ к Garmin Connect

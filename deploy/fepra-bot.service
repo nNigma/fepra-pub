@@ -1,19 +1,19 @@
 # systemd unit for the Telegram bot (polling).
-# Copy to /etc/systemd/system/kuznitsa-bot.service, adjust paths, then:
-#   systemctl daemon-reload && systemctl enable --now kuznitsa-bot
+# Copy to /etc/systemd/system/fepra-bot.service, adjust paths, then:
+#   systemctl daemon-reload && systemctl enable --now fepra-bot
 [Unit]
-Description=Kuznitsa Telegram bot
+Description=FePra Telegram bot
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 # Where you cloned the repo:
-WorkingDirectory=/opt/kuznitsa
+WorkingDirectory=/opt/fepra
 Environment=PYTHONPATH=src
 # Public HTTPS URL of the Mini App (same as MINIAPP_URL in .env):
 Environment=MINIAPP_URL=https://your-domain.example.org
-ExecStart=/opt/kuznitsa/.venv/bin/python -m tjbot.main
+ExecStart=/opt/fepra/.venv/bin/python -m tjbot.main
 Restart=always
 RestartSec=5
 
