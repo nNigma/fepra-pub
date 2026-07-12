@@ -13,7 +13,7 @@ FLASH = [("k", "gemini-2.5-flash")]
 
 @pytest.fixture(autouse=True)
 def _enable_claude(monkeypatch):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
 
 
 class _Proc:
@@ -166,3 +166,17 @@ def test_parse_board_fallback_to_claude(monkeypatch):
     assert out and out["engine_used"] == "claude"
     monkeypatch.setattr(botvision.llm, "claude_vision", lambda *a, **k: None)
     assert botvision.parse_board(b"img", engine="gemini") is None
+
+
+def test_claude_complete_forwards_model(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_LOCK_FILE", str(tmp_path / "l.lock"))
+    monkeypatch.setattr(llm, "_claude_bin", lambda: "/bin/claude")
+    seen = {}
+
+    def fake_run(prompt, cwd, timeout, kind, model="sonnet"):
+        seen["model"] = model
+        return "ok"
+
+    monkeypatch.setattr(llm, "_claude_run", fake_run)
+    assert llm.claude_complete("привет", model="opus") == "ok"
+    assert seen["model"] == "opus"

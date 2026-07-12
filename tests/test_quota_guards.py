@@ -86,7 +86,7 @@ class FakeCbUpdate:
 # ---- record_workout: фото доски -> спрашиваем движок, лимит гардит в board_engine ----
 
 def test_board_photo_asks_engine_then_quota_blocks(monkeypatch, tmp_path):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
     monkeypatch.setattr(vision, "has_vision", lambda: True)
     monkeypatch.setattr(vision, "has_claude", lambda: True)
     called = {"parse": False}
@@ -164,7 +164,7 @@ def test_board_engine_failure_offers_retry(monkeypatch, tmp_path):
 
 
 def test_board_retry_reasks_engine(monkeypatch, tmp_path):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
     monkeypatch.setattr(vision, "has_claude", lambda: True)
     ctx = FakeCtx(db_path=_db_path(tmp_path))
     ctx.user_data["board_photo"] = "f1"
@@ -235,7 +235,7 @@ def test_fill_result_photo_blocked_when_exhausted(monkeypatch, tmp_path):
 # ---- club (Программа зала): выбор движка распознавания программы ----
 
 def test_club_photo_asks_engine(monkeypatch, tmp_path):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
     monkeypatch.setattr(vision, "has_vision", lambda: True)
     monkeypatch.setattr(vision, "has_claude", lambda: True)
     ctx = FakeCtx(db_path=_db_path(tmp_path))
@@ -275,7 +275,7 @@ def test_club_add_engine_failure_offers_retry(monkeypatch, tmp_path):
 
 
 def test_club_add_retry_reasks_engine(monkeypatch, tmp_path):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
     monkeypatch.setattr(vision, "has_claude", lambda: True)
     ctx = FakeCtx(db_path=_db_path(tmp_path))
     ctx.user_data["club_photo"] = "f1"

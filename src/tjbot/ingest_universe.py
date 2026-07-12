@@ -36,7 +36,7 @@ def _creds():
 
 
 def _bot_token(env):
-    for k in ("TG_KUZ_BOT_TOKEN", "TG_BOT_TOKEN"):
+    for k in ("TG_FEPRA_BOT_TOKEN", "TG_BOT_TOKEN"):
         if t := (os.environ.get(k) or env.get(k)):
             return t
     return None

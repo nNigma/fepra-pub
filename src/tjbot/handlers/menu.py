@@ -56,6 +56,8 @@ _MENU_KEYS = [
     "btn.coach",
     "btn.club_date", "btn.club_add", "btn.club_edit", "btn.club_stats",
     "btn.admin_add_user", "btn.admin_del_user", "btn.pro", "btn.admin_stats",
+    "btn.meal_record", "btn.meal_water", "btn.meal_edit",   # под-меню «Питание»
+    "btn.meal_view", "btn.meal_report",
 ]
 
 
@@ -221,6 +223,9 @@ async def _profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     u = botdb.get_user(con, uid)
     last = last_watch_date(con, uid)
     acc = botdb.garmin_account_get(con, uid)
+    sam = botdb.watch_account_get(con, uid, "samsung")
+    wh = botdb.watch_account_get(con, uid, "whoop")
+    ap = botdb.watch_account_get(con, uid, "apple")
     lang = botdb.user_lang(con, uid)
     astro = botdb.user_astro(con, uid)
     goal = botdb.user_goal(con, uid)
@@ -232,18 +237,23 @@ async def _profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = i18n.t("profile.card", lang, nick=u["nick"], height=u["height_cm"],
                    weight=u["weight_kg"], sex=u["sex"], age=u["age"], gym=u["gym"],
                    last=last or "—")
+    sam_connected = bool(sam and sam["status"] == "connected")
+    whoop_connected = bool(wh and wh["status"] == "connected")
+    apple_connected = bool(ap and ap["status"] == "connected")
     await update.effective_message.reply_text(
-        text, reply_markup=_profile_kb(lang, bool(acc), astro, goal, city))
+        text, reply_markup=_profile_kb(lang, bool(acc), astro, goal, city, sam_connected,
+                                        whoop_connected, apple_connected))
 
 
 def _profile_kb(lang: str, has_acc: bool, astro: bool, goal: str = "maintain",
-                city: str = "Москва") -> InlineKeyboardMarkup:
+                city: str = "Москва", sam_connected: bool = False,
+                whoop_connected: bool = False, apple_connected: bool = False) -> InlineKeyboardMarkup:
     rows = []
     if has_acc:
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_sync", lang), callback_data="gsync")],
                  [InlineKeyboardButton(i18n.t("profile.btn_history", lang), callback_data="ghist")],
                  [InlineKeyboardButton(i18n.t("profile.btn_disconnect", lang), callback_data="gdisc")]]
-    else:
+    elif not sam_connected and not whoop_connected and not apple_connected:
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_connect", lang), callback_data="gconnect")]]
     rows.append([InlineKeyboardButton(i18n.t("profile.btn_bodyweight", lang), callback_data="bw:start")])
     rows.append([InlineKeyboardButton(
@@ -251,6 +261,26 @@ def _profile_kb(lang: str, has_acc: bool, astro: bool, goal: str = "maintain",
         callback_data="ngoal:open")])
     rows.append([InlineKeyboardButton(
         i18n.t("profile.btn_city", lang, city=city), callback_data="ncity:open")])
+    if sam_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_samsung_disconnect", lang), callback_data="wdisc:samsung")])
+    elif not has_acc and not whoop_connected and not apple_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_samsung_connect", lang), callback_data="wconnect:samsung")])
+    if whoop_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_whoop_sync", lang), callback_data="wsync:whoop")])
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_whoop_disconnect", lang), callback_data="wdisc:whoop")])
+    elif not has_acc and not sam_connected and not apple_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_whoop_connect", lang), callback_data="wconnect:whoop")])
+    if apple_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_apple_disconnect", lang), callback_data="wdisc:apple")])
+    elif not has_acc and not sam_connected and not whoop_connected:
+        rows.append([InlineKeyboardButton(
+            i18n.t("profile.btn_apple_connect", lang), callback_data="wconnect:apple")])
     astro_key = "profile.btn_astro_on" if astro else "profile.btn_astro_off"
     rows.append([InlineKeyboardButton(i18n.t(astro_key, lang), callback_data="astro:toggle")])
     return InlineKeyboardMarkup(rows)
@@ -267,12 +297,20 @@ async def astro_toggle_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         new = not botdb.user_astro(con, uid)
         botdb.set_astro(con, uid, new)
         acc = botdb.garmin_account_get(con, uid)
+        sam = botdb.watch_account_get(con, uid, "samsung")
+        wh = botdb.watch_account_get(con, uid, "whoop")
+        ap = botdb.watch_account_get(con, uid, "apple")
         goal = botdb.user_goal(con, uid)
         city = botdb.user_city(con, uid)
     finally:
         con.close()
+    sam_connected = bool(sam and sam["status"] == "connected")
+    whoop_connected = bool(wh and wh["status"] == "connected")
+    apple_connected = bool(ap and ap["status"] == "connected")
     await q.answer(i18n.t("profile.astro_on" if new else "profile.astro_off", lang))
-    await q.edit_message_reply_markup(reply_markup=_profile_kb(lang, bool(acc), new, goal, city))
+    await q.edit_message_reply_markup(
+        reply_markup=_profile_kb(lang, bool(acc), new, goal, city, sam_connected,
+                                  whoop_connected, apple_connected))
 
 
 @restricted

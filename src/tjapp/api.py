@@ -27,13 +27,17 @@ from tj.analysis import nutrition as _nutr
 from tj.analysis import nutrition_goals as ng
 from tjbot import db as botdb
 from tjbot.access import LLM_DAILY_LIMIT, is_admin, is_pro, llm_quota_consume, llm_quota_remaining
+from . import ingest as _ingest
+from . import whoop_oauth as _whoop_oauth
 from .auth import AuthError, authorized_user, resolve_effective_user
 
 has_llm = _llm.has_llm
 
 _STATIC = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="Кузница — Mini App")
+app = FastAPI(title="FePra — Mini App")
+app.include_router(_ingest.router)
+app.include_router(_whoop_oauth.router)
 
 
 def _athlete() -> tuple[int, str]:

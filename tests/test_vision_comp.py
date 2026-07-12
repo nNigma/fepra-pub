@@ -12,9 +12,9 @@ def test_parse_stages(monkeypatch):
 
 def test_parse_results(monkeypatch):
     monkeypatch.setattr(vision.llm, "vision",
-        lambda *a, **k: '{"athlete":"Атлет","rows":[{"stage":1,"value":"13:54","place":9}]}')
-    out = vision.parse_results(b"x", "Атлет")
-    assert out["athlete"] == "Атлет" and out["rows"][0]["place"] == 9
+        lambda *a, **k: '{"athlete":"Иван","rows":[{"stage":1,"value":"13:54","place":9}]}')
+    out = vision.parse_results(b"x", "Иван")
+    assert out["athlete"] == "Иван" and out["rows"][0]["place"] == 9
 
 
 def test_parse_stages_none_without_key(monkeypatch):

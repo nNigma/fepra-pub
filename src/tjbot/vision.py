@@ -106,8 +106,8 @@ _MEAL_MACRO = ("grams", "kcal", "protein_g", "fat_g", "carb_g")
 _MEAL_MICRO = ("fiber_g", "sugar_g", "sodium_mg", "iron_mg", "calcium_mg",
                "magnesium_mg", "potassium_mg")
 
-_MEAL_PROMPT = (
-    "На фото — еда. Определи блюда и оцени порции. Верни ТОЛЬКО JSON-объект:\n"
+_MEAL_JSON = (
+    "Верни ТОЛЬКО JSON-объект:\n"
     '{"foods": [{"name": "название по-русски", "grams": число,\n'
     '            "kcal": число, "protein_g": число, "fat_g": число, "carb_g": число,\n'
     '            "fiber_g": число, "sugar_g": число, "sodium_mg": число,\n'
@@ -122,6 +122,11 @@ _MEAL_PROMPT = (
     "- quality: 1 — цельная еда с белком; 2 — обычная сбалансированная; "
     "3 — жареное/сладкое без криминала; 4 — фастфуд/сахарная бомба. Оценивай "
     "состав блюд, не калораж;\n"
+)
+
+_MEAL_PROMPT = (
+    "На фото — еда. Определи блюда и оцени порции. "
+    + _MEAL_JSON +
     "- grams — съедобная порция на фото; ккал/БЖУ/микронутриенты считай именно "
     "для этих граммов (типовые табличные значения продукта);\n"
     "- ШТУКИ ПЕРЕСЧИТЫВАЙ ПО ФОТО: видно 2 манта — пиши 2, не предполагай "
@@ -134,6 +139,25 @@ _MEAL_PROMPT = (
     "оценку; упаковку/этикетку читай точно; не выдумывай блюда, которых на "
     "фото нет;\n"
     "- ориентиры масштаба: столовые приборы, руки, стандартная тарелка 24-26 см."
+)
+
+_MEAL_TEXT_PROMPT = (
+    "Пользователь описал словами, что он съел. Определи блюда и оцени порции. "
+    + _MEAL_JSON +
+    "- порция не указана — бери СТАНДАРТНУЮ порцию блюда (тарелка супа ~300 г, "
+    "кусок хлеба ~30 г, гарнир ~150 г, стакан напитка ~250 мл) и считай "
+    "ккал/БЖУ/микронутриенты именно для этих граммов (типовые табличные "
+    "значения);\n"
+    "- указано количество («2 яйца», «полтарелки», «большая порция») — "
+    "пересчитывай строго по нему, не заменяй «стандартной порцией»;\n"
+    "- домашние блюда считай по типовому рецепту («стандартный овощной суп» = "
+    "овощи на бульоне без сливок); скрытые ингредиенты (масло при жарке, соус, "
+    "сахар в напитке, заправка) включай в оценку;\n"
+    "- если неуказанная деталь сильно меняет калораж (на бульоне или со "
+    "сливками, жареное или варёное, с сахаром или без) — ставь confidence "
+    "medium/low и задай question именно про неё;\n"
+    "- не выдумывай блюда, которых нет в описании.\n"
+    "\nОПИСАНИЕ ЕДЫ:\n"
 )
 
 
@@ -182,6 +206,27 @@ def parse_meal(image_bytes: bytes, media_type: str = "image/jpeg",
     # еда — на opus: счёт штук и классификация блюд заметно точнее, чем у sonnet
     raw = llm.vision(image_bytes, prompt, media_type=media_type, engine=engine,
                      claude_model="opus", max_output_tokens=2000)
+    if not raw:
+        return None
+    data = _extract_json(raw)
+    return _valid_meal(data) if data else None
+
+
+def parse_meal_text(desc: str, engine: str = "gemini",
+                    correction: str | None = None) -> dict | None:
+    """Описание еды словами -> {foods, totals, question, confidence} | None.
+    correction — накопленные текст-уточнения для повторного парса."""
+    prompt = _MEAL_TEXT_PROMPT + desc.strip()[:600]
+    if correction:
+        prompt += f"\n\nУточнение пользователя (учти как факт): {correction.strip()[:400]}"
+    raw = None
+    if engine == "claude":
+        raw = llm.claude_complete(prompt, model="opus")
+        if not raw:
+            print("[llm] claude_complete не ответил, фолбэк на gemini", flush=True)
+    if not raw:
+        raw = llm.complete("Ты считаешь КБЖУ по описанию еды.", prompt,
+                           max_output_tokens=2000)
     if not raw:
         return None
     data = _extract_json(raw)

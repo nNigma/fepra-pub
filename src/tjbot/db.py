@@ -6,10 +6,12 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from tj.analysis import standards as _standards
@@ -105,6 +107,15 @@ _BOT_DDL = {
         "updated_at" TEXT, PRIMARY KEY ("tg_id","device_id") )''',
     "garmin_accounts": '''CREATE TABLE IF NOT EXISTS garmin_accounts (
         "tg_id" INTEGER PRIMARY KEY, "email" TEXT, "connected_at" TEXT, "status" TEXT )''',
+    "watch_accounts": '''CREATE TABLE IF NOT EXISTS watch_accounts (
+        "tg_id" INTEGER, "provider" TEXT, "status" TEXT, "connected_at" TEXT,
+        "token_hash" TEXT, "last_sync_at" TEXT,
+        PRIMARY KEY ("tg_id","provider") )''',
+    "whoop_tokens": '''CREATE TABLE IF NOT EXISTS whoop_tokens (
+        "tg_id" INTEGER PRIMARY KEY, "access_token" TEXT, "refresh_token" TEXT,
+        "expires_at" TEXT, "whoop_user_id" TEXT, "updated_at" TEXT )''',
+    "oauth_state": '''CREATE TABLE IF NOT EXISTS oauth_state (
+        "state" TEXT PRIMARY KEY, "tg_id" INTEGER, "provider" TEXT, "expires_at" TEXT )''',
     "action_log": '''CREATE TABLE IF NOT EXISTS action_log (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT, "tg_id" INTEGER, "action" TEXT, "ts" TEXT )''',
     "coach_qa": '''CREATE TABLE IF NOT EXISTS coach_qa (
@@ -117,7 +128,7 @@ OWNER_ID = OWNER_TG_ID
 
 
 def default_db_path() -> Path:
-    override = os.environ.get("KUZ_DB_PATH")
+    override = os.environ.get("FEPRA_DB_PATH")
     if override:
         return Path(override)
     return Path(__file__).resolve().parents[2] / "training.db"
@@ -235,6 +246,116 @@ def garmin_account_delete(con: sqlite3.Connection, tg_id: int) -> None:
     con.commit()
 
 
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def issue_watch_token(con: sqlite3.Connection, tg_id: int, provider: str) -> str:
+    """Завести/пересоздать аккаунт часов (status='pending') и вернуть сырой токен один раз."""
+    raw = secrets.token_urlsafe(24)
+    con.execute(
+        'INSERT INTO watch_accounts ("tg_id","provider","status","connected_at","token_hash","last_sync_at") '
+        'VALUES (?,?,?,?,?,?) '
+        'ON CONFLICT("tg_id","provider") DO UPDATE SET "status"=excluded."status", '
+        '"connected_at"=excluded."connected_at", "token_hash"=excluded."token_hash"',
+        (int(tg_id), provider, "pending",
+         datetime.now(timezone.utc).isoformat(timespec="seconds"), _hash_token(raw), None))
+    con.commit()
+    return raw
+
+
+def resolve_watch_token(con: sqlite3.Connection, raw: str) -> tuple[int, str] | None:
+    """Сырой токен -> (tg_id, provider) для активного аккаунта, иначе None."""
+    if not raw:
+        return None
+    r = con.execute(
+        'SELECT "tg_id","provider" FROM watch_accounts WHERE "token_hash"=? AND "status"!=?',
+        (_hash_token(raw), "revoked")).fetchone()
+    return (r["tg_id"], r["provider"]) if r else None
+
+
+def watch_account_get(con: sqlite3.Connection, tg_id: int, provider: str) -> dict | None:
+    r = con.execute(
+        'SELECT "tg_id","provider","status","connected_at","last_sync_at" FROM watch_accounts '
+        'WHERE "tg_id"=? AND "provider"=?', (int(tg_id), provider)).fetchone()
+    return dict(r) if r else None
+
+
+def watch_account_set_status(con: sqlite3.Connection, tg_id: int, provider: str, status: str) -> None:
+    con.execute('UPDATE watch_accounts SET "status"=? WHERE "tg_id"=? AND "provider"=?',
+                (status, int(tg_id), provider))
+    con.commit()
+
+
+def touch_watch_sync(con: sqlite3.Connection, tg_id: int, provider: str) -> None:
+    con.execute(
+        'UPDATE watch_accounts SET "status"=?, "last_sync_at"=? WHERE "tg_id"=? AND "provider"=?',
+        ("connected", datetime.now(timezone.utc).isoformat(timespec="seconds"), int(tg_id), provider))
+    con.commit()
+
+
+def whoop_tokens_get(con: sqlite3.Connection, tg_id: int) -> dict | None:
+    r = con.execute('SELECT * FROM whoop_tokens WHERE "tg_id"=?', (int(tg_id),)).fetchone()
+    return dict(r) if r else None
+
+
+def whoop_tokens_set(con: sqlite3.Connection, tg_id: int, *, access_token: str,
+                     refresh_token: str, expires_at: str, whoop_user_id: str | None = None) -> None:
+    con.execute("BEGIN IMMEDIATE")
+    con.execute(
+        'INSERT INTO whoop_tokens ("tg_id","access_token","refresh_token","expires_at","whoop_user_id","updated_at") '
+        'VALUES (?,?,?,?,?,?) '
+        'ON CONFLICT("tg_id") DO UPDATE SET "access_token"=excluded."access_token", '
+        '"refresh_token"=excluded."refresh_token", "expires_at"=excluded."expires_at", '
+        '"whoop_user_id"=COALESCE(excluded."whoop_user_id", whoop_tokens."whoop_user_id"), '
+        '"updated_at"=excluded."updated_at"',
+        (int(tg_id), access_token, refresh_token, expires_at, whoop_user_id,
+         datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    con.commit()
+
+
+def whoop_tokens_delete(con: sqlite3.Connection, tg_id: int) -> None:
+    con.execute('DELETE FROM whoop_tokens WHERE "tg_id"=?', (int(tg_id),))
+    con.commit()
+
+
+def oauth_state_issue(con: sqlite3.Connection, tg_id: int, provider: str, ttl_min: int = 10) -> str:
+    st = secrets.token_urlsafe(24)
+    exp = (datetime.now(timezone.utc) + timedelta(minutes=ttl_min)).isoformat()
+    con.execute('INSERT INTO oauth_state ("state","tg_id","provider","expires_at") VALUES (?,?,?,?)',
+                (st, int(tg_id), provider, exp))
+    con.commit()
+    return st
+
+
+def oauth_state_consume(con: sqlite3.Connection, state: str) -> tuple[int, str] | None:
+    r = con.execute('SELECT "tg_id","provider","expires_at" FROM oauth_state WHERE "state"=?',
+                    (state or "",)).fetchone()
+    if not r:
+        return None
+    con.execute('DELETE FROM oauth_state WHERE "state"=?', (state,))
+    con.commit()
+    if r["expires_at"] < datetime.now(timezone.utc).isoformat():
+        return None
+    return (r["tg_id"], r["provider"])
+
+
+def watch_account_ensure(con: sqlite3.Connection, tg_id: int, provider: str, status: str) -> None:
+    con.execute(
+        'INSERT INTO watch_accounts ("tg_id","provider","status","connected_at","token_hash","last_sync_at") '
+        'VALUES (?,?,?,?,NULL,NULL) '
+        'ON CONFLICT("tg_id","provider") DO UPDATE SET "status"=excluded."status", '
+        '"connected_at"=excluded."connected_at"',
+        (int(tg_id), provider, status, datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    con.commit()
+
+
+def watch_accounts_by_provider(con: sqlite3.Connection, provider: str) -> list[int]:
+    return [r["tg_id"] for r in con.execute(
+        'SELECT "tg_id" FROM watch_accounts WHERE "provider"=? AND "status"=? ORDER BY "tg_id"',
+        (provider, "connected"))]
+
+
 def _activity_row(a: Activity, note: str | None = None) -> tuple:
     """Объект Activity -> строка в порядке _COLS['activities']."""
     e = a.endurance
@@ -289,6 +410,23 @@ def insert_daily(con: sqlite3.Connection, m: DailyMetrics, tg_id: int) -> None:
     con.execute(f"INSERT OR REPLACE INTO daily VALUES ({ph})", _daily_row(m) + (tg_id,))
     con.commit()
     mark_data_changed(con)
+
+
+def upsert_daily_merge(con: sqlite3.Connection, m: DailyMetrics, tg_id: int) -> None:
+    """Апсерт дня без потери ручных полей: пустое в m добирается из старой строки, extra сливается."""
+    row = con.execute('SELECT * FROM daily WHERE "tg_id"=? AND "day"=?',
+                      (tg_id, m.day.isoformat())).fetchone()
+    if row:
+        for f in ("sleep_h", "resting_hr", "hrv", "body_battery", "readiness",
+                  "stress_avg", "weight_kg"):
+            if getattr(m, f) is None and row[f] is not None:
+                setattr(m, f, row[f])
+        try:
+            old = json.loads(row["extra"]) if row["extra"] else {}
+        except ValueError:
+            old = {}
+        m.extra = {**old, **(m.extra or {})}
+    insert_daily(con, m, tg_id)
 
 
 def set_bodyweight(con: sqlite3.Connection, day: str, kg: float, tg_id: int) -> None:

@@ -2,7 +2,7 @@
 
     PYTHONPATH=src .venv/bin/python -m tjbot.main
 
-Токен — TG_KUZ_BOT_TOKEN (в .env или окружении), берётся у @BotFather.
+Токен — TG_BOT_TOKEN (в .env или окружении), берётся у @BotFather.
 Доступ приватный: незнакомцу бот отдаёт его ID, владелец вписывает в users_allow.json.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from .handlers import (add_result, admin, bodyweight, club, coach, competition,
 from .handlers import self_feel as self_feel_h
 
 
-_TOKEN_KEYS = ("TG_KUZ_BOT_TOKEN", "TG_BOT_TOKEN")
+_TOKEN_KEYS = ("TG_FEPRA_BOT_TOKEN", "TG_BOT_TOKEN")
 
 
 def _token(env: dict) -> str:
@@ -28,7 +28,7 @@ def _token(env: dict) -> str:
         if tok:
             return tok
     raise SystemExit(
-        "Нет токена (TG_KUZ_BOT_TOKEN в .env или окружении). Возьми у @BotFather."
+        "Нет токена (TG_FEPRA_BOT_TOKEN в .env или окружении). Возьми у @BotFather."
     )
 
 
@@ -66,6 +66,10 @@ def build_application() -> Application:
     nutrition_profile.register(app)
     menu.register_stubs(app)
     self_feel_h.register(app)
+    from .handlers import watch as watch_handlers
+    watch_handlers.register(app)
+    from .handlers import whoop as whoop_handlers
+    whoop_handlers.register(app)
     from .handlers import lift_disambig
     app.add_handler(lift_disambig.handler())
     return app

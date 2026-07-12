@@ -133,9 +133,9 @@ _CLAUDE_ENABLED_CACHE: bool | None = None
 
 
 def claude_enabled() -> bool:
-    """Включён ли Claude-путь. Приоритет: env KUZ_USE_CLAUDE (живой, для тестов и
+    """Включён ли Claude-путь. Приоритет: env FEPRA_USE_CLAUDE (живой, для тестов и
     systemd) -> config.toml [llm].use_claude -> False. Чтение config кэшируется."""
-    env = os.environ.get("KUZ_USE_CLAUDE")
+    env = os.environ.get("FEPRA_USE_CLAUDE")
     if env is not None:
         return env.strip().lower() in ("1", "true", "yes", "on")
     global _CLAUDE_ENABLED_CACHE

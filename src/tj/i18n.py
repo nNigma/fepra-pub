@@ -51,6 +51,69 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.btn_sync": {"ru": "🔄 Синхронизировать часы", "en": "🔄 Sync watch"},
     "profile.btn_disconnect": {"ru": "❌ Отключить Garmin", "en": "❌ Disconnect Garmin"},
     "profile.btn_connect": {"ru": "🔗 Подключить Garmin", "en": "🔗 Connect Garmin"},
+    "profile.btn_samsung_connect": {"ru": "⌚ Подключить Samsung", "en": "⌚ Connect Samsung"},
+    "profile.btn_samsung_disconnect": {"ru": "⌚ Отключить Samsung", "en": "⌚ Disconnect Samsung"},
+    "watch.samsung_msg": {
+        "ru": ("Подключение Samsung в 3 шага:\n"
+               "1) Поставь приложение: {link}\n"
+               "2) Открой его и вставь токен: {token}\n"
+               "3) Разреши доступ к Health Connect.\n"
+               "Токен личный, не пересылай его."),
+        "en": ("Connect Samsung in 3 steps:\n"
+               "1) Install the app: {link}\n"
+               "2) Open it and paste the token: {token}\n"
+               "3) Grant Health Connect access.\n"
+               "The token is personal, do not share it."),
+    },
+    "watch.samsung_disconnected": {"ru": "Samsung отключён, данные сохранены.",
+                                   "en": "Samsung disconnected, data kept."},
+    "watch.apple_msg": {
+        "ru": "🍎 Подключение Apple Watch:\n"
+              "1. Поставь на iPhone приложение «Health Auto Export - JSON+CSV» "
+              "(App Store) и включи в нём Premium.\n"
+              "2. Разреши приложению доступ к Здоровью (все метрики и тренировки).\n"
+              "3. Создай Automation типа REST API:\n"
+              "   • URL: {url}\n"
+              "   • Headers: Authorization = Bearer {token}\n"
+              "   • Format: JSON · Aggregate: Days · Sync: включи «Since Last Sync»\n"
+              "4. Нажми Export для первой отправки — в Профиле появится «подключено».\n"
+              "Данные уходят, только когда iPhone разблокирован: ночная сводка "
+              "обычно доезжает утром.",
+        "en": "🍎 Connecting Apple Watch:\n"
+              "1. Install the “Health Auto Export - JSON+CSV” app (App Store) on "
+              "your iPhone and enable Premium.\n"
+              "2. Grant it access to Health (all metrics and workouts).\n"
+              "3. Create a REST API automation:\n"
+              "   • URL: {url}\n"
+              "   • Headers: Authorization = Bearer {token}\n"
+              "   • Format: JSON · Aggregate: Days · enable “Since Last Sync”\n"
+              "4. Tap Export to send the first batch — the Profile will show "
+              "“connected”.\n"
+              "Data is sent only while the iPhone is unlocked: the night’s data "
+              "usually arrives in the morning.",
+    },
+    "watch.apple_disconnected": {"ru": "Apple отключён, данные сохранены.",
+                                 "en": "Apple disconnected, data kept."},
+    "profile.btn_whoop_connect": {"ru": "⭕ Подключить Whoop", "en": "⭕ Connect Whoop"},
+    "profile.btn_whoop_sync": {"ru": "⭕ Синхронизировать Whoop", "en": "⭕ Sync Whoop"},
+    "profile.btn_whoop_disconnect": {"ru": "⭕ Отключить Whoop", "en": "⭕ Disconnect Whoop"},
+    "profile.btn_apple_connect": {"ru": "🍎 Подключить Apple Watch",
+                                  "en": "🍎 Connect Apple Watch"},
+    "profile.btn_apple_disconnect": {"ru": "🍎 Отключить Apple",
+                                     "en": "🍎 Disconnect Apple"},
+    "whoop.link_msg": {
+        "ru": "Подключение Whoop: открой ссылку, войди в аккаунт WHOOP и нажми Allow:\n{url}\nСсылка действует 10 минут.",
+        "en": "Connect Whoop: open the link, sign in to WHOOP and press Allow:\n{url}\nThe link is valid for 10 minutes.",
+    },
+    "whoop.not_configured": {"ru": "Whoop ещё не настроен на сервере (нет ключей приложения).",
+                             "en": "Whoop is not configured on the server yet (no app keys)."},
+    "whoop.syncing": {"ru": "Синхронизирую Whoop…", "en": "Syncing Whoop…"},
+    "whoop.synced": {"ru": "Whoop: дней {days}, тренировок {acts}.",
+                     "en": "Whoop: {days} days, {acts} workouts."},
+    "whoop.sync_error": {"ru": "Whoop: ошибка синка ({err}). Если повторяется — переподключи Whoop.",
+                         "en": "Whoop: sync error ({err}). If it persists, reconnect Whoop."},
+    "whoop.disconnected": {"ru": "Whoop отключён, данные сохранены.",
+                           "en": "Whoop disconnected, data kept."},
     "profile.btn_history": {"ru": "📥 Загрузить историю (60 дней)", "en": "📥 Load history (60 days)"},
     "profile.btn_astro_on": {"ru": "🔮 Гадание: вкл", "en": "🔮 Fortune: on"},
     "profile.btn_astro_off": {"ru": "🔮 Гадание: выкл", "en": "🔮 Fortune: off"},
@@ -126,7 +189,12 @@ STRINGS: dict[str, dict[str, str]] = {
                         "en": "Coach daily limit reached ({limit} questions/day)."},
     "coach.recent_empty": {"ru": "Обращений пока нет.", "en": "No questions yet."},
     "meal.ask_date": {"ru": "За какой день записываем еду?", "en": "Which day is this meal for?"},
-    "meal.ask_photo": {"ru": "Пришли фото еды 📷", "en": "Send a photo of the food 📷"},
+    "meal.ask_photo": {
+        "ru": "Пришли фото еды 📷 или опиши словами, что съел "
+              "(например: стандартный овощной суп, 2 куска хлеба)",
+        "en": "Send a photo of the food 📷 or describe it in words "
+              "(e.g.: a bowl of vegetable soup, 2 slices of bread)",
+    },
     "meal.ask_view_date": {"ru": "За какой день показать питание?", "en": "Which day to show?"},
     "meal.ask_edit_date": {"ru": "За какой день правим?", "en": "Which day to edit?"},
     "meal.edit_pick": {"ru": "Приёмы за {day} — выбери, какой править:",
@@ -137,8 +205,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "meal.deleted": {"ru": "Удалил приём.", "en": "Meal deleted."},
     "meal.fixed": {"ru": "Переписал приём: {kcal} ккал.", "en": "Meal updated: {kcal} kcal."},
     "meal.fix_no_photo": {
-        "ru": "У этого приёма нет сохранённого фото — удали его и запиши заново.",
-        "en": "This meal has no stored photo — delete it and log again.",
+        "ru": "У этого приёма нет ни фото, ни описания — поправить нечем; "
+              "удали его и запиши заново.",
+        "en": "This meal has no photo or description to re-parse — "
+              "delete it and log it again.",
     },
     "meal.water_head": {"ru": "💧 Вода за сегодня: {v} л", "en": "💧 Water today: {v} l"},
     "meal.view_head": {"ru": "🍽 Питание за {day}", "en": "🍽 Nutrition for {day}"},
@@ -155,8 +225,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "meal.parsing": {"ru": "🍽 Смотрю, что на тарелке… (до минуты — считаю внимательно)",
                      "en": "🍽 Looking at the plate… (up to a minute — counting carefully)"},
     "meal.not_recognized": {
-        "ru": "Не смог разобрать еду на фото. Попробуй другой ракурс/свет — или пришли фото ещё раз.",
-        "en": "Couldn't read the food from the photo. Try another angle/light and send it again.",
+        "ru": "Не смог разобрать еду. Опиши подробнее словами или пришли фото ещё раз.",
+        "en": "Couldn't parse the food. Describe it in more detail or send a photo again.",
     },
     "meal.card_head": {"ru": "Вот что вижу:", "en": "Here's what I see:"},
     "meal.card_food": {"ru": "• {name} — ~{grams} г · {kcal} ккал",
@@ -177,8 +247,8 @@ STRINGS: dict[str, dict[str, str]] = {
               "I remember previous corrections.",
     },
     "meal.cancelled": {"ru": "Ок, не записываю.", "en": "OK, not saving."},
-    "meal.context_lost": {"ru": "Потерял контекст — пришли фото ещё раз.",
-                          "en": "Lost context — send the photo again."},
+    "meal.context_lost": {"ru": "Потерял контекст — начни запись еды заново.",
+                          "en": "Lost the context — start the meal entry again."},
     "meal.saved": {"ru": "Записал: {kcal} ккал. ", "en": "Saved: {kcal} kcal. "},
     "meal.saved_day": {"ru": "За {day}: {kcal} ккал, белка {p} г.",
                        "en": "{day} so far: {kcal} kcal, protein {p} g."},
@@ -606,7 +676,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin.ask_tg_id": {"ru": "Пришли Telegram ID пользователя (число). Или /cancel.",
                          "en": "Send the user's Telegram ID (a number). Or /cancel."},
     "admin.need_number": {"ru": "Нужно число — Telegram ID.", "en": "Need a number - Telegram ID."},
-    "admin.user_added": {"ru": "Пущен в бота: {tg_id}", "en": "Let into the bot: {tg_id}"},
+    "admin.user_added": {"ru": "Пущен в бота: {tg_id}", "en": "Added to bot: {tg_id}"},
     "admin.cancelled": {"ru": "Отменил.", "en": "Cancelled."},
     "admin.nobody_to_remove": {"ru": "Пока некого удалять.", "en": "Nobody to remove yet."},
     "admin.pick_to_remove": {"ru": "Кого убрать из бота?", "en": "Who should be removed from the bot?"},
@@ -628,8 +698,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "A review run is already in progress — wait for the report.",
     },
     "admin.review_no_claude": {
-        "ru": "ИИ недоступен — не настроен ни один ключ (Gemini/Claude).",
-        "en": "AI unavailable — no backend configured (Gemini/Claude).",
+        "ru": "Claude CLI на этой машине не найден — разбор недоступен.",
+        "en": "Claude CLI not found on this machine — review unavailable.",
     },
     "admin.review_done": {"ru": "Разбор полётов готов:", "en": "Flight review done:"},
     "admin.review_user_line": {

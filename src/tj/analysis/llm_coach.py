@@ -231,7 +231,7 @@ def summary_payload(summary: dict) -> dict:
     state = summary.get("state") or {}
     m = summary.get("m") or {}
     verdict_source = (summary.get("verdict") or {}).get("source")
-    has_biometrics = verdict_source == "garmin" or any(
+    has_biometrics = verdict_source == "watch" or any(
         m.get(k) is not None for k in ("readiness", "hrv", "rhr", "sleep"))
     return {
         "range": summary.get("range"),

@@ -12,7 +12,7 @@ import os
 import time
 from urllib.parse import parse_qsl
 
-_TOKEN_KEYS = ("TG_KUZ_BOT_TOKEN", "TG_BOT_TOKEN")
+_TOKEN_KEYS = ("TG_FEPRA_BOT_TOKEN", "TG_BOT_TOKEN")
 
 
 class AuthError(Exception):
@@ -27,7 +27,7 @@ def bot_token() -> str:
         tok = os.environ.get(k) or env.get(k)
         if tok:
             return tok
-    raise AuthError("нет токена бота (TG_KUZ_BOT_TOKEN)")
+    raise AuthError("нет токена бота (TG_FEPRA_BOT_TOKEN)")
 
 
 def validate_init_data(init_data: str, token: str | None = None, max_age_s: int = 86400) -> dict:

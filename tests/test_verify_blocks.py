@@ -12,7 +12,7 @@ from tjbot import vision
 
 @pytest.fixture(autouse=True)
 def _enable_claude(monkeypatch):
-    monkeypatch.setenv("KUZ_USE_CLAUDE", "1")
+    monkeypatch.setenv("FEPRA_USE_CLAUDE", "1")
 
 
 def _blocks():

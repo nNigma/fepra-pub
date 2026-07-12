@@ -40,7 +40,7 @@ def _first(seq, key, default=None):
 
 def readiness_source(bio_readiness, self_feel):
     if bio_readiness is not None:
-        return bio_readiness, "garmin"
+        return bio_readiness, "watch"
     if self_feel is not None:
         return int(self_feel) * 10, "self"
     return None, None

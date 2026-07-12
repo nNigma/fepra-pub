@@ -13,10 +13,10 @@ def test_summary_payload_flags_no_biometrics():
     assert p.get("has_biometrics") is False and p.get("self_feel") == 7
 
 
-def test_summary_payload_flags_has_biometrics_via_garmin_source():
+def test_summary_payload_flags_has_biometrics_via_watch_source():
     data = {"m": {"readiness": None, "hrv": None, "rhr": None, "sleep": None},
-            "state": {"readiness": {"value": 62, "source": "garmin"}}, "agg": {},
-            "verdict": {"source": "garmin"}, "self_feel": None}
+            "state": {"readiness": {"value": 62, "source": "watch"}}, "agg": {},
+            "verdict": {"source": "watch"}, "self_feel": None}
     p = summary_payload(data)
     assert p.get("has_biometrics") is True
 

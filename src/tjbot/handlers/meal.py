@@ -2,9 +2,11 @@
 редактирование, просмотр дня, отчёт в Mini App.
 
 Фото принимается ТОЛЬКО внутри потока «📸 Записать» (случайные фото в чат
-больше не считаются едой). Разбор еды — только Pro (запись/правка за гейтом);
-движок — Claude с фолбэком на Gemini, не-админ под дневной квотой. «Поправить» — текст-уточнение,
-парс повторяется с ним (у сохранённого приёма — по хранимому фото).
+больше не считаются едой), но вместо фото можно прислать текстовое описание
+еды — оно сохраняется в note и по нему же идёт перепарс при правке. Разбор
+еды — только Pro (запись/правка за гейтом); движок — Claude с фолбэком на
+Gemini, не-админ под дневной квотой. «Поправить» — текст-уточнение, парс
+повторяется с ним (у сохранённого приёма — по хранимому фото или note).
 """
 from __future__ import annotations
 
@@ -152,22 +154,28 @@ def _card_kb(prefix: str, lang: str) -> InlineKeyboardMarkup:
     ]])
 
 
-async def _parse_photo(msg, context, uid: int, lang: str, prefix: str):
-    """Скачивает meal_photo, парсит с НАКОПЛЕННЫМИ уточнениями (подпись к фото +
-    все правки — каждый пересчёт видит их все), показывает карточку.
-    -> True, если карточка показана."""
+async def _parse_draft(msg, context, uid: int, lang: str, prefix: str):
+    """Парсит приём из user_data: meal_photo (фото) или meal_desc (описание
+    словами), с НАКОПЛЕННЫМИ уточнениями (meal_notes - каждый пересчёт видит
+    их все), показывает карточку. -> True, если карточка показана."""
     photo_id = context.user_data.get("meal_photo")
-    if not photo_id:
+    desc = context.user_data.get("meal_desc")
+    if not photo_id and not desc:
         return False
     notes = context.user_data.get("meal_notes") or []
     correction = "; ".join(notes) if notes else None
     await msg.reply_text(i18n.t("meal.parsing", lang))
     try:
-        f = await context.bot.get_file(photo_id)
-        buf = await f.download_as_bytearray()
-        draft = vision.parse_meal(bytes(buf), engine=vision.engine_for(uid),
-                                  correction=correction)
-    except Exception:
+        if photo_id:
+            f = await context.bot.get_file(photo_id)
+            buf = await f.download_as_bytearray()
+            draft = vision.parse_meal(bytes(buf), engine=vision.engine_for(uid),
+                                      correction=correction)
+        else:
+            draft = vision.parse_meal_text(desc, engine=vision.engine_for(uid),
+                                           correction=correction)
+    except Exception as e:
+        print(f"[meal] парс не удался: {type(e).__name__}", flush=True)
         draft = None
     if not draft:
         await msg.reply_text(i18n.t("meal.not_recognized", lang))
@@ -184,10 +192,29 @@ async def rec_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text(
             i18n.t("meal.llm_limit", lang, limit=access.LLM_DAILY_LIMIT))
         return ConversationHandler.END
+    context.user_data.pop("meal_desc", None)
     context.user_data["meal_photo"] = update.message.photo[-1].file_id
     caption = (update.message.caption or "").strip()   # подпись к фото = уточнение
     context.user_data["meal_notes"] = [caption] if caption else []
-    ok = await _parse_photo(update.message, context, uid, lang, "mr")
+    ok = await _parse_draft(update.message, context, uid, lang, "mr")
+    return R_CONFIRM if ok else R_PHOTO
+
+
+async def rec_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    uid = update.effective_user.id
+    lang = _lang(context, uid)
+    text = (update.message.text or "").strip()
+    if len(text) < 3:
+        await update.message.reply_text(i18n.t("meal.ask_photo", lang))
+        return R_PHOTO
+    if not access.is_admin(uid) and not access.llm_quota_consume(uid):
+        await update.message.reply_text(
+            i18n.t("meal.llm_limit", lang, limit=access.LLM_DAILY_LIMIT))
+        return ConversationHandler.END
+    context.user_data.pop("meal_photo", None)
+    context.user_data["meal_desc"] = text[:600]
+    context.user_data["meal_notes"] = []
+    ok = await _parse_draft(update.message, context, uid, lang, "mr")
     return R_CONFIRM if ok else R_PHOTO
 
 
@@ -219,6 +246,7 @@ async def rec_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     try:
         botdb.add_meal(con, uid, day, _meal_ts(day, context),
                        draft["foods"], draft["totals"],
+                       note=context.user_data.get("meal_desc"),
                        photo_id=context.user_data.get("meal_photo"),
                        engine=vision.engine_for(uid),
                        quality=draft.get("quality"), quality_note=draft.get("quality_note"))
@@ -242,12 +270,13 @@ async def rec_correction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(i18n.t("meal.ask_correction", lang))
         return R_CORR
     context.user_data.setdefault("meal_notes", []).append(text)
-    ok = await _parse_photo(update.message, context, uid, lang, "mr")
+    ok = await _parse_draft(update.message, context, uid, lang, "mr")
     return R_CONFIRM if ok else _clear_end(context)
 
 
 def _clear_end(context) -> int:
-    for k in ("meal_draft", "meal_photo", "meal_day", "meal_edit_id", "meal_notes"):
+    for k in ("meal_draft", "meal_photo", "meal_desc", "meal_day",
+              "meal_edit_id", "meal_edit_ts", "meal_notes"):
         context.user_data.pop(k, None)
     return ConversationHandler.END
 
@@ -480,10 +509,15 @@ async def edit_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     finally:
         con.close()
     m = meals.get(meal_id)
-    if not m or not m.get("photo_id"):
+    if not m or not (m.get("photo_id") or m.get("note")):
         await q.edit_message_text(i18n.t("meal.fix_no_photo", lang))
         return _clear_end(context)
-    context.user_data["meal_photo"] = m["photo_id"]
+    context.user_data.pop("meal_photo", None)
+    context.user_data.pop("meal_desc", None)
+    if m.get("photo_id"):
+        context.user_data["meal_photo"] = m["photo_id"]
+    else:
+        context.user_data["meal_desc"] = m["note"]
     context.user_data["meal_edit_ts"] = m["ts"]
     context.user_data["meal_notes"] = []
     await q.edit_message_text(i18n.t("meal.ask_correction", lang))
@@ -498,7 +532,7 @@ async def edit_correction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(i18n.t("meal.ask_correction", lang))
         return E_CORR
     context.user_data.setdefault("meal_notes", []).append(text)
-    ok = await _parse_photo(update.message, context, uid, lang, "me")
+    ok = await _parse_draft(update.message, context, uid, lang, "me")
     return E_CONFIRM if ok else _clear_end(context)
 
 
@@ -525,6 +559,7 @@ async def edit_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     try:
         botdb.delete_meal(con, uid, meal_id)          # правка = замена приёма
         botdb.add_meal(con, uid, day, ts, draft["foods"], draft["totals"],
+                       note=context.user_data.get("meal_desc"),
                        photo_id=context.user_data.get("meal_photo"),
                        engine=vision.engine_for(uid),
                        quality=draft.get("quality"), quality_note=draft.get("quality_note"))
@@ -532,7 +567,6 @@ async def edit_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         con.close()
     await q.edit_message_text(
         i18n.t("meal.fixed", lang, kcal=_fmt_num(draft["totals"]["kcal"])))
-    context.user_data.pop("meal_edit_ts", None)
     return _clear_end(context)
 
 
@@ -561,7 +595,8 @@ def register(app) -> None:
         states={
             R_DATE: [CallbackQueryHandler(rec_date, pattern=r"^mrd:")],
             R_DATE_INPUT: [MessageHandler(not_menu_text(), rec_date_input)],
-            R_PHOTO: [MessageHandler(filters.PHOTO, rec_photo)],
+            R_PHOTO: [MessageHandler(filters.PHOTO, rec_photo),
+                      MessageHandler(not_menu_text(), rec_text)],
             R_CONFIRM: [CallbackQueryHandler(rec_confirm, pattern=r"^mr:")],
             R_CORR: [MessageHandler(not_menu_text(), rec_correction)],
         },
