@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "nodes": [
+    {"slug": "crossfit", "parent": null, "kind": "sport", "title_ru": "Кроссфит", "title_en": "CrossFit", "status": "planned", "sort": 10},
+    {"slug": "crossfit-strength-531", "parent": "crossfit", "kind": "program", "title_ru": "Силовой цикл (5/3/1-стиль)", "title_en": "Strength cycle (5/3/1 style)", "status": "planned", "sort": 10},
+    {"slug": "crossfit-linear-5x5", "parent": "crossfit", "kind": "program", "title_ru": "Линейная прогрессия / волна 5×5", "title_en": "Linear progression / 5x5 wave", "status": "planned", "sort": 20},
+    {"slug": "crossfit-benchmarks", "parent": "crossfit", "kind": "program", "title_ru": "Бенчмарки с повторными замерами", "title_en": "Benchmarks with re-tests", "status": "planned", "sort": 30},
+    {"slug": "crossfit-open-prep", "parent": "crossfit", "kind": "program", "title_ru": "Подготовка к Open", "title_en": "Open preparation", "status": "planned", "sort": 40},
+    {"slug": "crossfit-metcon-builder", "parent": "crossfit", "kind": "program", "title_ru": "Конструктор метконов (EMOM, AMRAP, For Time)", "title_en": "Metcon builder (EMOM, AMRAP, For Time)", "status": "planned", "sort": 50},
+    {"slug": "crossfit-hyrox", "parent": "crossfit", "kind": "program", "title_ru": "Hyrox", "title_en": "Hyrox", "status": "planned", "sort": 60},
+    {"slug": "crossfit-paid-catalog", "parent": "crossfit", "kind": "program", "title_ru": "Каталог платных программ (ссылки)", "title_en": "Paid programs catalog (links)", "status": "planned", "sort": 70},
+
+    {"slug": "weightlifting", "parent": null, "kind": "sport", "title_ru": "ТА", "title_en": "Weightlifting", "status": "active", "sort": 20},
+    {"slug": "bulgarian", "parent": "weightlifting", "kind": "system", "title_ru": "Болгарская система", "title_en": "Bulgarian system", "status": "active", "sort": 10},
+    {"slug": "bulgarian-adaptation", "parent": "bulgarian", "kind": "program", "title_ru": "Адаптация: 3 дня, затем рост частоты", "title_en": "Adaptation: 3 days, then growing frequency", "status": "active", "sort": 10, "template_slug": "bulgarian-adaptation"},
+    {"slug": "bulgarian-peak-8w", "parent": "bulgarian", "kind": "program", "title_ru": "Цикл до теста максимума (8 недель)", "title_en": "8 weeks to a max test", "status": "active", "sort": 20, "template_slug": "bulgarian-peak-8w"},
+
+    {"slug": "running", "parent": null, "kind": "sport", "title_ru": "Бег", "title_en": "Running", "status": "planned", "sort": 30},
+    {"slug": "run-endurance", "parent": "running", "kind": "program", "title_ru": "Повышение выносливости", "title_en": "Build endurance", "status": "planned", "sort": 10},
+    {"slug": "run-speed", "parent": "running", "kind": "program", "title_ru": "Повышение скорости", "title_en": "Build speed", "status": "planned", "sort": 20},
+    {"slug": "run-half-marathon", "parent": "running", "kind": "program", "title_ru": "Подготовка к полумарафону", "title_en": "Half marathon preparation", "status": "planned", "sort": 30},
+    {"slug": "run-marathon", "parent": "running", "kind": "program", "title_ru": "Подготовка к марафону", "title_en": "Marathon preparation", "status": "planned", "sort": 40},
+    {"slug": "run-intervals", "parent": "running", "kind": "program", "title_ru": "Скоростные тренировки", "title_en": "Interval sessions", "status": "planned", "sort": 50}
+  ]
+}

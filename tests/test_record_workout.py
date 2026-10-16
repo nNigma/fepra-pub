@@ -118,6 +118,6 @@ def test_deterministic_template_no_llm():
              "4 AMRAP 3 мин х 5 / 1 мин отдых\n- 16 рывков\n- 8 подтягивания\n")
     blocks = parse_program(board)
     tmpl = render_template(blocks)
-    assert "раунд 1 (вес×повторы): ___" in tmpl
+    assert "раунд 1 (вес×повторы):" in tmpl
     assert "AMRAP (5×3мин):" in tmpl
     assert tmpl.count("круги, амрап") == 5

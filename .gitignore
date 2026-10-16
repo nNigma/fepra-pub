@@ -35,3 +35,9 @@ dist/
 # ── os / editor ─────────────────────────────────────────────────
 .DS_Store
 *.apk
+
+# ── PWA (web/) ──────────────────────────────────────────────────
+# static/app/ is a build artifact: `cd web && npm ci && npm run build`
+web/node_modules/
+src/tjapp/static/app/
+.claude/

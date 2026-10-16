@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
+from ..models import BOARD_SPORT_VALUES
 from ..store.build import _connect
 from .engine import analyze, daily_loads
 from .load import acwr
@@ -156,7 +157,7 @@ def _session_block(a):
         perf.append(f"RPE {rpe}")
     if perf:
         lines.append("- Выполнение: " + ", ".join(perf))
-    elif sport == "crossfit":
+    elif sport in BOARD_SPORT_VALUES:
         lines.append("- _performed пуст — внеси вес / счёт / RPE вручную_")
     return ["", *lines]
 

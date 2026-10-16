@@ -19,42 +19,22 @@ from . import menu
 from .menu import show_menu
 
 KIND, DISC, VALUE = range(3)
-BTN_RESULT = "➕ Результат"
+BTN_RESULT = "✍️ Ввести ПМ"
 
 
-def parse_lift(txt: str):
-    s = txt.strip().lower().replace("кг", "").strip()
-    m = re.match(r"^(\d+(?:[.,]\d+)?)\s*[xхXХ×* ]\s*(\d+)$", s)
-    if m:
-        load = float(m.group(1).replace(",", "."))
-        reps = int(m.group(2))
-        return (load, reps) if load > 0 and reps >= 1 else None
-    m = re.match(r"^(\d+(?:[.,]\d+)?)$", s)
-    if m:
-        load = float(m.group(1).replace(",", "."))
-        return (load, 1) if load > 0 else None
-    return None
-
-
-def parse_benchmark(txt: str, unit: str):
-    s = txt.strip().lower()
-    if unit == "rounds":
-        m = re.match(r"^(\d+)", s)
-        return float(m.group(1)) if m else None
-    if ":" in s:
-        m = re.match(r"^(\d+):(\d{1,2})$", s)
-        if not m:
-            return None
-        mm, ss = int(m.group(1)), int(m.group(2))
-        if ss >= 60:
-            return None
-        return float(mm * 60 + ss)
-    m = re.match(r"^(\d+)$", s)
-    return float(m.group(1)) if m else None
+from tj.analysis.parse_input import est_1rm_for, parse_benchmark, parse_lift  # noqa: E402,F401  реэкспорт
 
 
 def _tz(context):
     return ZoneInfo(context.bot_data.get("tz", "UTC"))
+
+
+async def send_kind_prompt(message, lang) -> None:
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("recresult.btn_lift", lang), callback_data="k:lift"),
+        InlineKeyboardButton(i18n.t("recresult.btn_benchmark", lang), callback_data="k:benchmark"),
+    ]])
+    await message.reply_text(i18n.t("recresult.ask_kind", lang), reply_markup=kb)
 
 
 @restricted
@@ -62,11 +42,7 @@ async def entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     con = botdb.connect(context.bot_data["db_path"])
     lang = botdb.user_lang(con, update.effective_user.id)
     con.close()
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton(i18n.t("recresult.btn_lift", lang), callback_data="k:lift"),
-        InlineKeyboardButton(i18n.t("recresult.btn_benchmark", lang), callback_data="k:benchmark"),
-    ]])
-    await update.effective_message.reply_text(i18n.t("recresult.ask_kind", lang), reply_markup=kb)
+    await send_kind_prompt(update.effective_message, lang)
     return KIND
 
 
@@ -124,7 +100,7 @@ async def take_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 await update.effective_message.reply_text(i18n.t("recresult.lift_invalid", lang))
                 return VALUE
             load, reps = parsed
-            est = epley_1rm(load, reps)
+            est = est_1rm_for(load, reps)
             botdb.add_result(con, tg_id=tg_id, discipline=did, value=load, reps=reps,
                              est_1rm=est, source="manual", day=day)
             best = botdb.best_results(con, tg_id)
@@ -163,7 +139,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 def handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Text(menu.btn_variants("btn.result")), entry),
+            MessageHandler(filters.Text(menu.btn_variants("btn.enter_pm")), entry),
             CallbackQueryHandler(pick_kind, pattern=r"^k:"),
             CallbackQueryHandler(pick_disc, pattern=r"^x:"),
         ],

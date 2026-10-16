@@ -1,0 +1,55 @@
+/* Экраны записи тренировки. Переменные темы — из styles.legacy.css */
+.rec-steps { display: flex; gap: 6px; margin: 0 0 14px; }
+.rec-steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--bd); }
+.rec-steps i.on { background: var(--btn); }
+.rec-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.rec-chip { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--bd); background: var(--card); font-size: 15px; }
+.rec-chip.on { background: var(--greenb); border-color: var(--green); color: var(--green); font-weight: 600; }
+.rec-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--bd); }
+.rec-row:last-child { border-bottom: 0; }
+.rec-row > label { font-size: 14px; }
+.rec-row .unit { font-size: 11.5px; color: var(--mut); display: block; }
+.rec-row.bad input { border-color: var(--red); }
+.rec-in { min-height: 44px; width: 96px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--bd); background: var(--card); color: var(--tx); font-size: 16px; text-align: center; }
+.rec-in.wide { width: 130px; }
+.rec-pair { display: flex; align-items: center; gap: 6px; }
+.rec-pair .rec-in { width: 78px; }
+.rec-pair.wrap { flex-wrap: wrap; }
+.rec-pair select.rec-in { width: auto; }
+.rec-sub { font-size: 12.5px; font-weight: 600; margin: 10px 0 2px; color: var(--mut); }
+.rec-err { font-size: 12px; color: var(--red); grid-column: 1 / -1; }
+.rec-grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+.rec-grid5 button { min-height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--card); font-size: 16px; }
+.rec-grid5 button.on { background: var(--btn); border-color: var(--btn); color: #fff; font-weight: 600; }
+.rec-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.rec-preview { max-width: 100%; max-height: 260px; border-radius: 12px; border: 1px solid var(--bd); display: block; margin: 8px 0; }
+.rec-board { width: 100%; min-height: 160px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--bd); background: var(--card); color: var(--tx); font-size: 15px; line-height: 1.45; }
+.rec-pre { white-space: pre-wrap; font-size: 13px; line-height: 1.5; color: var(--mut); }
+.rec-how { font-size: 13px; line-height: 1.5; margin: 6px 0 12px; }
+.rec-how li { margin: 3px 0; }
+.rec-fab { position: fixed; right: 16px; bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 26px; background: var(--btn); color: #fff; border: 0; font-size: 28px; line-height: 1; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,.25); z-index: 5; }
+.rec-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rec-inline .rec-in { width: 110px; }
+.rec-inline select.rec-in { width: auto; min-width: 140px; text-align: left; }
+.rec-q { background: var(--amberb); border: 1px solid var(--amber); border-radius: 12px; padding: 11px 13px; margin: 8px 0; }
+.rec-ok { background: var(--greenb); border-radius: 10px; padding: 8px 11px; margin: 6px 0; font-size: 14px; }
+
+/* повторы по схеме: как обычное значение, чуть приглушены, пока их не меняли */
+.rec-pair .rec-in.preset { opacity: .8; }
+
+/* сани и другие составные поля: подпись строки сверху, ячейки в ряд */
+.rec-row.stack { grid-template-columns: 1fr; gap: 6px; }
+.rec-multi { display: grid; grid-template-columns: 1fr 1fr 1.7fr; gap: 8px; align-items: end; }
+.rec-multi .cell { display: block; min-width: 0; }
+.rec-multi .cap { display: block; font-size: 11.5px; color: var(--mut); margin-bottom: 3px; }
+.rec-multi .rec-in { width: 100%; min-width: 0; padding-left: 4px; padding-right: 4px; }
+.rec-multi .tpair { display: flex; gap: 4px; }
+.rec-multi .tpair .rec-in { flex: 1 1 0; }
+.rec-multi .tpair select.rec-in { flex: 0 0 auto; width: auto; padding-left: 6px; padding-right: 2px; }
+
+/* программа зала: карточка на выбор дня и на главных экранах */
+.gym-card { border: 1px solid var(--green); background: var(--greenb); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+.gym-prev { white-space: pre-wrap; font: inherit; font-size: 13px; margin: 6px 0 10px; max-height: 8.5em; overflow: hidden; opacity: .9; }
+
+.gym-pick { margin: 8px 0 12px; }
+.gym-pick .rec-chips { margin-top: 4px; }

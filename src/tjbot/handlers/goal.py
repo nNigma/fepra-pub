@@ -51,7 +51,7 @@ async def del_goal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     gid = int(q.data.split(":", 1)[1])
     con = botdb.connect(context.bot_data["db_path"])
     try:
-        botdb.archive_goal(con, gid)
+        botdb.archive_goal(con, gid, q.from_user.id)
     finally:
         con.close()
     await q.edit_message_text(i18n.t("goal.removed_msg", lang))

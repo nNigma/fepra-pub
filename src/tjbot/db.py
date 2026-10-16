@@ -137,7 +137,11 @@ def default_db_path() -> Path:
 def connect(path) -> sqlite3.Connection:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(p))
+    # FastAPI отдаёт синхронные зависимости и хендлеры разным потокам пула:
+    # соединение создаётся в одном, а используется в другом. Одно соединение всегда
+    # принадлежит одному запросу (последовательно), так что это безопасно.
+    # timeout: бот и API пишут в одну БД, ждём блокировку, а не падаем сразу.
+    con = sqlite3.connect(str(p), check_same_thread=False, timeout=30)
     con.row_factory = sqlite3.Row
     return con
 
@@ -210,11 +214,14 @@ def init_schema(con: sqlite3.Connection) -> None:
             pass
     for tbl in ("claude_review", "next_advice", "wk_narrative"):
         _migrate_pk_add_lang(con, tbl)
+    con.execute('INSERT OR IGNORE INTO gyms ("name","is_default") VALUES (\'Universe\',1)')
     try:
         seed_standards(con)
     except Exception:
         pass
     con.commit()
+    from tj.migrations import run_migrations
+    run_migrations(con)
 
 
 def garmin_tokenstore(tg_id) -> Path:
@@ -361,6 +368,11 @@ def _activity_row(a: Activity, note: str | None = None) -> tuple:
     e = a.endurance
     presc = a.strength.prescription if a.strength else None
     perf = a.strength.performed if a.strength else None
+    extra = dict(getattr(a, "extra", None) or {})
+    if a.source != "manual":
+        # Время старта нужно слиянию ручной записи с часами по пересечению по времени.
+        # У ручных записей время — только то, что указал сам атлет (extra["start_ts"]).
+        extra.setdefault("start_ts", a.start.isoformat())
     return (
         note, a.start.date().isoformat(), a.sport.value, a.activity_id, a.source,
         a.duration_min, a.avg_hr, a.max_hr, a.calories,
@@ -373,7 +385,7 @@ def _activity_row(a: Activity, note: str | None = None) -> tuple:
         perf.load_kg if perf else None,
         perf.score if perf else None,
         perf.rpe if perf else None,
-        json.dumps(getattr(a, "extra", None) or {}, ensure_ascii=False),
+        json.dumps(extra, ensure_ascii=False),
     )
 
 
@@ -455,7 +467,6 @@ def add_meal(con: sqlite3.Connection, tg_id: int, day: str, ts: str,
          totals.get("kcal"), totals.get("protein_g"), totals.get("fat_g"),
          totals.get("carb_g"), note, photo_id, engine, quality, quality_note))
     con.commit()
-    mark_data_changed(con)
     return cur.lastrowid
 
 
@@ -758,10 +769,55 @@ def all_users(con: sqlite3.Connection) -> list[dict]:
     return [{"tg_id": r["tg_id"], "nick": r["nick"]} for r in rows]
 
 
-def gym_members(con: sqlite3.Connection, gym: str) -> list[dict]:
+def list_gyms(con: sqlite3.Connection) -> list[dict]:
     rows = con.execute(
-        'SELECT "tg_id","nick","sex","weight_kg" FROM users WHERE "gym"=? ORDER BY "nick"',
-        (gym,)).fetchall()
+        'SELECT "name","is_default" FROM gyms ORDER BY "is_default" DESC, "name"').fetchall()
+    return [dict(r) for r in rows]
+
+
+def default_gym(con: sqlite3.Connection) -> str:
+    row = con.execute(
+        'SELECT "name" FROM gyms WHERE "is_default"=1 ORDER BY "name" LIMIT 1').fetchone()
+    return row["name"] if row else "Universe"
+
+
+def gym_exists(con: sqlite3.Connection, name: str) -> bool:
+    return any(g["name"].casefold() == name.casefold() for g in list_gyms(con))
+
+
+def add_gym(con: sqlite3.Connection, name: str) -> None:
+    con.execute('INSERT OR IGNORE INTO gyms ("name") VALUES (?)', (name,))
+    con.commit()
+
+
+def _ensure_user_gyms(con: sqlite3.Connection) -> None:
+    con.execute('CREATE TABLE IF NOT EXISTS user_gyms ('
+                '"tg_id" INTEGER NOT NULL, "gym" TEXT NOT NULL, PRIMARY KEY("tg_id","gym"))')
+
+
+def extra_gyms(con: sqlite3.Connection, tg_id: int) -> list[str]:
+    """Дополнительные залы атлета (кроме основного users.gym)."""
+    _ensure_user_gyms(con)
+    own = (get_user(con, tg_id) or {"gym": None})["gym"]
+    return [r["gym"] for r in con.execute(
+        'SELECT "gym" FROM user_gyms WHERE "tg_id"=? ORDER BY "gym"', (int(tg_id),))
+        if r["gym"] != own]
+
+
+def set_extra_gyms(con: sqlite3.Connection, tg_id: int, names: list[str]) -> None:
+    _ensure_user_gyms(con)
+    con.execute('DELETE FROM user_gyms WHERE "tg_id"=?', (int(tg_id),))
+    con.executemany('INSERT OR IGNORE INTO user_gyms ("tg_id","gym") VALUES (?,?)',
+                    [(int(tg_id), n) for n in dict.fromkeys(names)])
+    con.commit()
+
+
+def gym_members(con: sqlite3.Connection, gym: str) -> list[dict]:
+    _ensure_user_gyms(con)
+    rows = con.execute(
+        'SELECT "tg_id","nick","sex","weight_kg" FROM users WHERE "gym"=? '
+        'OR "tg_id" IN (SELECT "tg_id" FROM user_gyms WHERE "gym"=?) ORDER BY "nick"',
+        (gym, gym)).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -774,6 +830,38 @@ def save_user(con: sqlite3.Connection, tg_id: int, *, nick, height_cm, weight_kg
         (int(tg_id), nick, height_cm, weight_kg, sex, age, gym, level,
          datetime.now(timezone.utc).isoformat(timespec="seconds")),
     )
+    con.commit()
+
+
+def set_nick(con: sqlite3.Connection, tg_id: int, nick: str) -> None:
+    con.execute('UPDATE users SET "nick"=? WHERE "tg_id"=?', (nick.strip()[:40], int(tg_id)))
+    con.commit()
+
+
+def set_height(con: sqlite3.Connection, tg_id: int, height_cm: int) -> None:
+    con.execute('UPDATE users SET "height_cm"=? WHERE "tg_id"=?', (int(height_cm), int(tg_id)))
+    con.commit()
+
+
+def set_weight(con: sqlite3.Connection, tg_id: int, weight_kg: float) -> None:
+    con.execute('UPDATE users SET "weight_kg"=? WHERE "tg_id"=?', (float(weight_kg), int(tg_id)))
+    con.commit()
+
+
+def set_sex(con: sqlite3.Connection, tg_id: int, sex: str) -> None:
+    if sex not in ("m", "f"):
+        raise ValueError(f"bad sex: {sex!r}")
+    con.execute('UPDATE users SET "sex"=? WHERE "tg_id"=?', (sex, int(tg_id)))
+    con.commit()
+
+
+def set_age(con: sqlite3.Connection, tg_id: int, age: int) -> None:
+    con.execute('UPDATE users SET "age"=? WHERE "tg_id"=?', (int(age), int(tg_id)))
+    con.commit()
+
+
+def set_gym(con: sqlite3.Connection, tg_id: int, gym: str) -> None:
+    con.execute('UPDATE users SET "gym"=? WHERE "tg_id"=?', (gym, int(tg_id)))
     con.commit()
 
 
@@ -955,7 +1043,9 @@ def seed_standards(con: sqlite3.Connection) -> None:
     discs = _standards.disciplines()
     for d in discs.values():
         con.execute(
-            'INSERT OR REPLACE INTO disciplines VALUES (?,?,?,?,?,?,?,?,?)',
+            'INSERT OR REPLACE INTO disciplines '
+            '("id","name_ru","name_en","kind","unit","better","basis","ontology","order_idx") '
+            'VALUES (?,?,?,?,?,?,?,?,?)',
             (d["id"], d["name_ru"], d.get("name_en"), d["kind"], d["unit"], d["better"],
              d["basis"], d.get("ontology"), d["order"]))
     tiers = _standards.tiers()
@@ -998,13 +1088,21 @@ def active_goals(con, tg_id) -> list:
     return [dict(r) for r in rows]
 
 
-def archive_goal(con, goal_id) -> None:
-    con.execute("UPDATE goals SET status='archived' WHERE id=?", (goal_id,))
+def archive_goal(con, goal_id, tg_id=None) -> None:
+    """Архивирует цель. С tg_id — только если цель принадлежит этому пользователю
+    (иначе можно закрыть чужую, зная номер)."""
+    if tg_id is None:
+        con.execute("UPDATE goals SET status='archived' WHERE id=?", (goal_id,))
+    else:
+        con.execute("UPDATE goals SET status='archived' WHERE id=? AND tg_id=?", (goal_id, tg_id))
     con.commit()
 
 
-def complete_goal(con, goal_id) -> None:
-    con.execute("UPDATE goals SET status='done' WHERE id=?", (goal_id,))
+def complete_goal(con, goal_id, tg_id=None) -> None:
+    if tg_id is None:
+        con.execute("UPDATE goals SET status='done' WHERE id=?", (goal_id,))
+    else:
+        con.execute("UPDATE goals SET status='done' WHERE id=? AND tg_id=?", (goal_id, tg_id))
     con.commit()
 
 
@@ -1067,6 +1165,17 @@ def lifts_to_results(con, parsed) -> list:
         # точный алиас, иначе — скан канонов внутри описательной фразы (последний лифт;
         # для комплекса «взятие+толчок» это clean_and_jerk, а не просто clean)
         canon = _ontology.resolve(movement, aliases)
+        # компаунд (кластер) -> засчитываем вес в обе дисциплины
+        comp = canon if _ontology.is_compound(canon) else next(
+            (c for c in _ontology.find(movement, aliases) if _ontology.is_compound(c)), None)
+        if comp:
+            parts = ([comp] if comp in onto_to_disc else []) + [
+                p for p in _ontology.compound(comp) if p in onto_to_disc]
+            for part in parts:
+                pdid = onto_to_disc[part]
+                out.append({"discipline": pdid, "name": discs[pdid]["name_ru"],
+                            "weight": weight, "reps": reps, "est_1rm": _epley(weight, reps)})
+            continue
         did = onto_to_disc.get(canon)
         if not did:
             lift_canons = [c for c in _ontology.find(movement, aliases) if c in onto_to_disc]
@@ -1108,11 +1217,24 @@ def split_lifts(con, parsed):
             lift_canons = [c for c in found if c in onto_to_disc]
             fam_canons = [c for c in found if _ontology.variant_family(c)]
             canon = lift_canons[-1] if lift_canons else (fam_canons[-1] if fam_canons else None)
+
+        def _row(d):
+            return {"discipline": d, "name": discs[d]["name_ru"],
+                    "weight": weight, "reps": reps, "est_1rm": _epley(weight, reps)}
+
+        # компаунд (кластер) -> засчитываем вес в саму дисциплину и в компоненты
+        comp = canon if _ontology.is_compound(canon) else next(
+            (c for c in _ontology.find(movement, aliases) if _ontology.is_compound(c)), None)
+        if comp:
+            for d in ([onto_to_disc[comp]] if comp in onto_to_disc else []) + [
+                    onto_to_disc[p] for p in _ontology.compound(comp) if p in onto_to_disc]:
+                resolved.append(_row(d))
+            continue
+
         did = onto_to_disc.get(canon)
         fam = _ontology.variant_family(canon)
         if did:
-            resolved.append({"discipline": did, "name": discs[did]["name_ru"],
-                             "weight": weight, "reps": reps, "est_1rm": _epley(weight, reps)})
+            resolved.append(_row(did))
         elif fam:
             ambiguous.append({"family": fam, "weight": weight, "reps": reps, "movement": movement})
     return resolved, ambiguous
@@ -1204,12 +1326,22 @@ def claude_review_put_many(con, tg_ids, day, text, created_at=None, lang="ru") -
 
 
 def claude_reviews_pending(con, tg_id, lang="ru") -> list[dict]:
+    """Дни без разбора — ПО ОДНОМУ на день. Ручная запись и активность с часов
+    за тот же день — одна тренировка (их сливает workouts._merged_rows), значит
+    и разбор один. Тип берём из ручной записи: атлет знает, что это было, часы
+    пишут обобщённо (ТА и Hyrox приезжают с них как strength_training)."""
     rows = con.execute(
-        'SELECT DISTINCT a."day", a."sport" FROM activities a '
+        'SELECT a."day", a."sport", a."source" FROM activities a '
         'WHERE a."tg_id"=? AND a."day" NOT IN '
         '(SELECT "day" FROM claude_review WHERE "tg_id"=? AND "lang"=?) '
         'ORDER BY a."day" DESC', (int(tg_id), int(tg_id), lang)).fetchall()
-    return [{"day": r["day"], "sport": r["sport"]} for r in rows]
+    out: dict[str, dict] = {}
+    for r in rows:
+        cur = out.get(r["day"])
+        if cur is None or (cur["source"] != "manual" and r["source"] == "manual"):
+            out[r["day"]] = {"day": r["day"], "sport": r["sport"], "source": r["source"]}
+    return [{"day": v["day"], "sport": v["sport"]}
+            for v in sorted(out.values(), key=lambda v: v["day"], reverse=True)]
 
 
 def next_advice_put(con, tg_id, source, text, created_at=None, lang="ru") -> None:

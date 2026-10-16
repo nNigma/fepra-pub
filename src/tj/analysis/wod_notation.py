@@ -4,6 +4,7 @@
 покрываются едиными символьными классами (М/M, О/O, Е/E, х/x и т.д.)."""
 from __future__ import annotations
 
+import math
 import re
 
 A = "[аaАA]"
@@ -80,6 +81,39 @@ def parse_weight_reps(s: str):
     w = _f(m.group(1))
     reps = int(m.group(2)) if m.group(2) else 1
     return (w, reps) if w > 0 and reps >= 1 else None
+
+
+def parse_scheme(value) -> list[int] | None:
+    """Схема лесенки к единому типу: список положительных int (>= 2 элементов).
+    Принимает и список, и строку «21-15-9» (Claude-верификация присылает строкой).
+    Всё, что не разбирается, -> None."""
+    if isinstance(value, str):
+        s = value.strip()
+        if not _SCHEME_BODY.fullmatch(s):
+            s = _SCHEME_LEAD.sub("", value).strip()
+        if not _SCHEME_BODY.fullmatch(s):
+            return None
+        items = re.split(DASH, re.sub(r"\s", "", s))
+    elif isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
+        return None
+    nums: list[int] = []
+    for x in items:
+        if isinstance(x, bool):
+            return None
+        if isinstance(x, int):
+            n = x
+        elif isinstance(x, float) and math.isfinite(x) and x == int(x):
+            n = int(x)
+        elif isinstance(x, str) and x.strip().isdigit():
+            n = int(x.strip())
+        else:
+            return None
+        if n <= 0:
+            return None
+        nums.append(n)
+    return nums if len(nums) >= 2 else None
 
 
 def parse_notation(line: str) -> dict | None:

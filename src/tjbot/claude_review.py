@@ -1,10 +1,10 @@
-"""Авторазборы Месье Клода через headless `claude -p` (крон на сервере).
+"""Авторазборы через LLM (крон на сервере).
 
 Порт логики скилла fepra-claude-review в автономный режим: по каждому
 Pro-атлету — поденные разборы новых тренировок + общий разбор Сводки за 30 дней
 + совет на следующую тренировку. Показ и так за Pro-гейтом, поэтому и генерим
-только Pro. Текст пишет Claude по подписке (llm.claude_complete, под общим
-файловым локом с vision); сбой любого шага — пропуск этого шага, не стоп прогона.
+только Pro. Текст: agent/claude по FEPRA_LLM_ENGINE, фолбэк Gemini (llm.text_complete);
+сбой любого шага — пропуск этого шага, не стоп прогона.
 
 Запуск на сервере: server_review.py ПОСЛЕ server_sync.py (данные уже свежие).
 """
@@ -14,14 +14,18 @@ import datetime
 import json
 
 from tj import llm
+from tj.models import BOARD_SPORT_VALUES
 from tj.analysis import llm_coach
-from tj.analysis.dashboard import summary_data
-from tj.analysis.workouts import recent_workouts, workout_report
+from tj.analysis.workouts import workout_report
 
 from . import access
 from . import db as botdb
+from . import llm_gen
+from . import tg_notify
 
-LOOKBACK_DAYS = 30            # свежие дни важнее архива (как в скилле)
+LOOKBACK_DAYS = 2             # окно догона: прогон раз в сутки разбирает вчера,
+                              # а если сутки пропустили — заодно позавчера.
+                              # Текущий день не трогаем: он ещё не прожит
 _TIMEOUT = 300.0              # разбор с большим контекстом думает дольше vision
 
 _ROLE = (
@@ -54,18 +58,6 @@ _WORKOUT_INSTR = (
     '{{"kind":"risk","title":"Риск","body":"…"}},'
     '{{"kind":"advice","title":"Совет","body":"…"}}]\n'
     'Верни ТОЛЬКО JSON-объект вида {{"review_md":"…","narrative":[…]}}.\n\n'
-    "ДАННЫЕ:\n{context}"
-)
-
-_SUMMARY_INSTR = (
-    "Ниже JSON-контекст формы атлета за 30 дней: payload (форма, ACWR, VO2max, "
-    "тренды, риск; nutrition7 — среднее питание за неделю, если записано — "
-    "свяжи с нагрузкой и восстановлением), sessions — тренировки окна.\n"
-    "Напиши общий markdown-разбор тремя разделами: '## Куда идёт форма' "
-    "(динамика месяца), '## Что за блок' (характер 30 дней: баланс модальностей, "
-    "перекосы, тяжёлые серии), '## Риски и куда дальше'.{astro}\n"
-    "Плюс ОДНУ строку — совет, что делать на ближайшей тренировке.\n"
-    'Верни ТОЛЬКО JSON-объект вида {{"summary_md":"…","advice":"…"}}.\n\n'
     "ДАННЫЕ:\n{context}"
 )
 
@@ -114,9 +106,14 @@ def _valid_narrative(blocks) -> bool:
                and isinstance(b.get("body"), str) for b in blocks)
 
 
-def _ask(instr: str) -> dict | None:
-    raw = llm.deep_complete(_ROLE + "\n\n" + instr, timeout=_TIMEOUT)
-    return _extract_obj(raw) if raw else None
+def _ask(instr: str) -> tuple[dict | None, str | None]:
+    """Поденный разбор: agent/claude по FEPRA_LLM_ENGINE, затем Gemini."""
+    raw, engine = llm.text_complete(_ROLE + "\n\n" + instr, timeout=_TIMEOUT,
+                                    max_output_tokens=2600)
+    if not raw:
+        return None, None
+    obj = _extract_obj(raw)
+    return (obj, engine) if obj else (None, engine)
 
 
 def review_day(con, tg_id: int, day: str, sport: str | None = None,
@@ -129,15 +126,15 @@ def review_day(con, tg_id: int, day: str, sport: str | None = None,
     if not rep:
         return {"day": day, "skip": "no data"}
     payload = llm_coach.workout_payload(rep)
-    if (sport or "").startswith("crossfit") and not payload.get("board") \
+    if (sport or "") in BOARD_SPORT_VALUES and not payload.get("board") \
             and not payload.get("work"):
-        return {"day": day, "skip": "crossfit без доски"}
+        return {"day": day, "skip": f"{sport} без доски"}
     payload["bodyweight_kg"] = botdb.latest_weight(con, tg_id, day)
     payload["nutrition"] = _nutrition_block(con, tg_id, day)
     bundle = {"day": day, "trimp": rep.get("trimp"),
               "payload": payload, "history": rep.get("history")}
     astro = botdb.user_astro(con, tg_id)
-    obj = _ask(_WORKOUT_INSTR.format(
+    obj, engine = _ask(_WORKOUT_INSTR.format(
         day=day, astro=_ASTRO_NOTE if astro else "",
         context=json.dumps(bundle, ensure_ascii=False)))
     md = ((obj or {}).get("review_md") or "").strip()
@@ -145,68 +142,92 @@ def review_day(con, tg_id: int, day: str, sport: str | None = None,
         return {"day": day, "error": "llm"}
     botdb.claude_review_put(con, tg_id, day, md,
                             datetime.date.today().isoformat(), lang=lang)
-    botdb.llm_cache_delete(con, tg_id, "workout", day)   # Клод перекрывает Gemini
+    botdb.llm_cache_delete(con, tg_id, "workout", day)   # глубокий разбор перекрывает Gemini
     nar = (obj or {}).get("narrative")
     if _valid_narrative(nar):
-        botdb.wk_narrative_put(con, tg_id, day, "claude", nar, lang=lang)
+        botdb.wk_narrative_put(con, tg_id, day, engine or "claude", nar, lang=lang)
     return {"day": day, "ok": True, "narrative": _valid_narrative(nar)}
-
-
-def review_summary(con, tg_id: int, lang: str = "ru",
-                   db_path: str | None = None) -> dict:
-    """Общий разбор Сводки за 30 дней + совет. Перезаписывается каждый прогон."""
-    db_path = str(db_path or botdb.default_db_path())
-    hr_max, sex = botdb.profile_hr_sex(con, tg_id)
-    today = datetime.date.today()
-    data = summary_data(db_path, "sqlite", hr_max, sex, today, tg_id=tg_id)
-    payload = llm_coach.summary_payload(data)
-    payload["weight_kg"] = botdb.latest_weight(con, tg_id)
-    from tj.analysis import nutrition as nutr
-    ns = nutr.period_summary(botdb.nutrition_days(con, tg_id, days=7),
-                             botdb.water_days(con, tg_id), payload["weight_kg"])
-    payload["nutrition7"] = ns if ns.get("days") else None
-    cutoff = (today - datetime.timedelta(days=LOOKBACK_DAYS)).isoformat()
-    rows = [r for r in recent_workouts(db_path, "sqlite", limit=80, tg_id=tg_id)
-            if r["day"] >= cutoff]
-    sessions = [{"day": r["day"], "sport": r["sport"], "wod_name": r.get("wod_name"),
-                 "duration_min": r.get("duration_min"), "avg_hr": r.get("avg_hr"),
-                 "primary_benefit": (r.get("extra") or {}).get("primary_benefit"),
-                 "readiness": r.get("readiness")} for r in rows]
-    bundle = {"range_days": LOOKBACK_DAYS, "today": today.isoformat(),
-              "workouts_count": len(sessions), "payload": payload,
-              "sessions": sessions}
-    astro = botdb.user_astro(con, tg_id)
-    obj = _ask(_SUMMARY_INSTR.format(
-        astro=_ASTRO_NOTE if astro else "",
-        context=json.dumps(bundle, ensure_ascii=False)))
-    md = ((obj or {}).get("summary_md") or "").strip()
-    if not md:
-        return {"summary": False, "error": "llm"}
-    botdb.claude_review_put(con, tg_id, "summary", md,
-                            today.isoformat(), lang=lang)
-    botdb.llm_cache_delete(con, tg_id, "summary", "30d")
-    advice = ((obj or {}).get("advice") or "").strip()
-    if advice:
-        botdb.next_advice_put(con, tg_id, "claude", advice, lang=lang)
-    return {"summary": True, "advice": bool(advice)}
 
 
 def run_user(con, tg_id: int, db_path: str | None = None) -> dict:
     lang = botdb.user_lang(con, tg_id)
-    cutoff = (datetime.date.today()
-              - datetime.timedelta(days=LOOKBACK_DAYS)).isoformat()
+    db_path = str(db_path or botdb.default_db_path())
+    today = datetime.date.today()
+    cutoff = (today - datetime.timedelta(days=LOOKBACK_DAYS)).isoformat()
+    last = (today - datetime.timedelta(days=1)).isoformat()
     pending = [p for p in botdb.claude_reviews_pending(con, tg_id, lang=lang)
-               if p["day"] >= cutoff]
+               if cutoff <= p["day"] <= last]
     days = [review_day(con, tg_id, p["day"], p.get("sport"), lang=lang,
                        db_path=db_path)
             for p in pending]
-    return {"tg_id": tg_id, "lang": lang, "days": days,
-            **review_summary(con, tg_id, lang=lang, db_path=db_path)}
+    sweep_errs = llm_gen.sweep(con, db_path, tg_id, lang, refresh_stale=True,
+                               kinds={"summary", "nutr_day", "nutr_week", "competitions"}) or []
+    summary_ok = not any(e.get("kind") == "summary" for e in sweep_errs)
+    out = {"tg_id": tg_id, "lang": lang, "days": days, "summary": summary_ok}
+    if sweep_errs:
+        out["sweep_errors"] = sweep_errs
+    return out
+
+
+def _bot_token() -> str | None:
+    return tg_notify.bot_token()
+
+
+def _tg_send(token: str, chat_id: int, text: str) -> None:
+    tg_notify.send(token, chat_id, text)
+
+
+def _errors(results: list[dict]) -> list[str]:
+    out = []
+    for r in results:
+        if r.get("error"):
+            out.append(f"{r.get('tg_id', '-')}: {r['error']}")
+        for d in r.get("days") or []:
+            if d.get("error"):
+                out.append(f"{r.get('tg_id', '-')} {d.get('day', '-')}: {d['error']}")
+        for e in r.get("sweep_errors") or []:
+            out.append(f"{r.get('tg_id', '-')} sweep {e.get('kind')}/{e.get('ref')}: "
+                       f"{e.get('error')}")
+    return out
+
+
+def notify_admins(results: list[dict]) -> bool:
+    """Ошибки прогона — сообщением админам в TG (падение видно не только в логе).
+    Сбой самой отправки глотается: уведомление не должно ронять крон."""
+    errs = _errors(results)
+    if not errs:
+        return False
+    token = _bot_token()
+    if not token:
+        return False
+    text = "⚠️ FePra авторазбор: ошибки\n" + "\n".join(errs[:20])
+    for admin_id in sorted(access.load_admins()):
+        try:
+            _tg_send(token, admin_id, text)
+        except OSError:
+            pass
+    return True
+
+
+def _notify_ready(con, tg_id: int, res: dict) -> None:
+    """«Разбор готов» пользователю: баннер + push (+ Telegram как запас, пока жив бот).
+    Только если реально появились новые поденные разборы; сбой не ломает крон."""
+    n = sum(1 for d in res.get("days") or [] if d.get("ok"))
+    if not n:
+        return
+    try:
+        from tj.services import push
+        push.notify_user(con, tg_id, "review_ready",
+                         "Разбор от Месье Клод готов" if n == 1 else f"Разборы от Месье Клод готовы: {n}",
+                         title="Разбор готов", url="/app/#/reviews", tg=True, dedupe=False)
+    except Exception as e:  # noqa: BLE001
+        print(f"[review] user notify failed: {type(e).__name__}", flush=True)
 
 
 def run_all(db_path=None) -> list[dict]:
-    """Прогон по всем Pro. Текст пишет Claude (если включён) или Gemini —
-    через deep_complete. Сбой шага — пропуск, не порча данных."""
+    """Прогон по всем Pro. Нет ни agent/claude, ни Gemini — отказ без порчи данных."""
+    if not llm.has_text_llm():
+        return [{"error": "LLM недоступен (нет agent/claude/gemini)"}]
     path = db_path or botdb.default_db_path()
     out = []
     con = botdb.connect(path)
@@ -214,7 +235,9 @@ def run_all(db_path=None) -> list[dict]:
         botdb.init_schema(con)
         for tg_id in sorted(access.load_pro()):
             try:
-                out.append(run_user(con, tg_id, db_path=str(path)))
+                res = run_user(con, tg_id, db_path=str(path))
+                out.append(res)
+                _notify_ready(con, tg_id, res)
             except Exception as e:
                 out.append({"tg_id": tg_id, "error": type(e).__name__})
     finally:

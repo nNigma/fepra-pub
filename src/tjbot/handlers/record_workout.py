@@ -15,8 +15,9 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
                           ConversationHandler, MessageHandler, filters)
 
 from tj import i18n
-from tj.models import (Activity, Scaling, Sport, StrengthWodDetails, WodFormat,
-                       WodPerformed, WodPrescription)
+from tj.models import (BOARD_SPORTS, Activity, Scaling, Sport,
+                       StrengthWodDetails, WodFormat, WodPerformed,
+                       WodPrescription)
 from .. import access
 from .. import activity
 from .. import db as botdb
@@ -30,7 +31,8 @@ from .record_result import parse_lift
 (DATE, DATE_INPUT, SPORT, UNIVERSE_ASK, BOARD, BOARD_ENGINE, BOARD_CONFIRM, RESULT,
  MAX_CONFIRM, MAX_EDIT, BODYWEIGHT) = range(11)
 
-_SPORTS = {"crossfit": Sport.CROSSFIT, "run": Sport.RUN, "bike": Sport.BIKE}
+_SPORTS = {"crossfit": Sport.CROSSFIT, "weightlifting": Sport.WEIGHTLIFTING,
+           "hyrox": Sport.HYROX, "run": Sport.RUN, "bike": Sport.BIKE}
 
 
 def _llm_limit_msg(lang: str) -> str:
@@ -99,11 +101,18 @@ async def date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def _ask_sport(message, context: ContextTypes.DEFAULT_TYPE, lang: str) -> int:
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton(i18n.t("record.btn_crossfit", lang), callback_data="s:crossfit"),
-        InlineKeyboardButton(i18n.t("record.btn_run", lang), callback_data="s:run"),
-        InlineKeyboardButton(i18n.t("record.btn_bike", lang), callback_data="s:bike"),
-    ]])
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(i18n.t("record.btn_crossfit", lang), callback_data="s:crossfit"),
+            InlineKeyboardButton(i18n.t("record.btn_weightlifting", lang),
+                                 callback_data="s:weightlifting"),
+            InlineKeyboardButton(i18n.t("record.btn_hyrox", lang), callback_data="s:hyrox"),
+        ],
+        [
+            InlineKeyboardButton(i18n.t("record.btn_run", lang), callback_data="s:run"),
+            InlineKeyboardButton(i18n.t("record.btn_bike", lang), callback_data="s:bike"),
+        ],
+    ])
     await message.reply_text(i18n.t("record.ask_sport", lang), reply_markup=kb)
     return SPORT
 
@@ -116,7 +125,7 @@ async def pick_sport(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     con.close()
     context.user_data["sport"] = _SPORTS[q.data.split(":", 1)[1]]
     await q.edit_message_text(i18n.t("record.sport_chosen", lang, sport=context.user_data["sport"].value))
-    if context.user_data["sport"] == Sport.CROSSFIT:
+    if context.user_data["sport"] in BOARD_SPORTS:
         await q.message.reply_text(i18n.t("record.ask_board", lang))
         return BOARD
     await q.message.reply_text(i18n.t("record.ask_result_cardio", lang))
@@ -301,11 +310,26 @@ async def board_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.user_data["result_blocks"] = blocks
             tmpl = render_template(blocks)
     if tmpl:
-        await q.message.reply_text(
-            i18n.t("record.fill_results_template", lang, tmpl=tmpl[:1500]))
+        await q.message.reply_text(i18n.t("record.fill_results_template", lang))
+        await q.message.reply_text(tmpl[:3500], reply_markup=results_help_kb(lang))
     else:
         await q.message.reply_text(_result_prompt(lang))
     return RESULT
+
+
+def results_help_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        i18n.t("record.btn_results_help", lang), callback_data="reshelp")]])
+
+
+async def results_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    con = botdb.connect(context.bot_data["db_path"])
+    lang = botdb.user_lang(con, q.from_user.id)
+    con.close()
+    await q.message.reply_text(i18n.t("onboarding.results_guide", lang))
+    return None
 
 
 _RPE_RE = re.compile(r"rpe\s*[:=]?\s*(\d{1,2})", re.IGNORECASE)
@@ -319,7 +343,7 @@ def _build_activity(ud: dict, tz: ZoneInfo, tg_id: int) -> Activity:
                    activity_id=f"manual-{tg_id}-{d.isoformat()}-{sport.value}")
     result = ud.get("result", "")
     rpe = int(m.group(1)) if (m := _RPE_RE.search(result)) else None
-    if sport == Sport.CROSSFIT:
+    if sport in BOARD_SPORTS:
         scaling = Scaling.SCALED if "scal" in result.lower() or "скейл" in result.lower() else (
             Scaling.RX if "rx" in result.lower() else None)
         presc = WodPrescription(raw_text=ud.get("board_text"))
@@ -335,12 +359,13 @@ def _build_activity(ud: dict, tz: ZoneInfo, tg_id: int) -> Activity:
     return act
 
 
-def _crossfit_activity(day, board_text, board_source, result_text, tz: ZoneInfo,
-                       tg_id: int, wod_format=None) -> Activity:
-    """Кроссфит-активность (source=manual) из даты, доски и текста результата."""
+def _board_activity(day, board_text, board_source, result_text, tz: ZoneInfo,
+                    tg_id: int, wod_format=None, sport: Sport = Sport.CROSSFIT) -> Activity:
+    """Активность с доской (source=manual) из даты, доски и текста результата.
+    Кроссфит, ТА и Hyrox проходят одним путём — отличается только тип."""
     start = datetime.combine(day, time(12, 0), tzinfo=tz)
-    act = Activity(source="manual", sport=Sport.CROSSFIT, start=start,
-                   activity_id=f"manual-{tg_id}-{day.isoformat()}-{Sport.CROSSFIT.value}")
+    act = Activity(source="manual", sport=sport, start=start,
+                   activity_id=f"manual-{tg_id}-{day.isoformat()}-{sport.value}")
     rpe = int(m.group(1)) if (m := _RPE_RE.search(result_text or "")) else None
     low = (result_text or "").lower()
     scaling = Scaling.SCALED if "scal" in low or "скейл" in low else (
@@ -358,13 +383,15 @@ def _crossfit_activity(day, board_text, board_source, result_text, tz: ZoneInfo,
 
 
 async def save_filled_result(update, context, day, board_text, board_source,
-                             result_text, blocks, verified=False):
+                             result_text, blocks, verified=False,
+                             sport: Sport = Sport.CROSSFIT):
     """Сохранить заполненный результат кроссфит-тренировки: активность + метконы + максы.
     Максы пишутся сразу в уровни (record_lift_results), как в edit_workout.
     Возвращает (results, metcon_lines, activity_id). Общее для record и add_result."""
     from tj.analysis.wod_results import summarize_filled, extract_maxes
     tg_id = update.effective_user.id
-    act = _crossfit_activity(day, board_text, board_source, result_text, _tz(context), tg_id)
+    act = _board_activity(day, board_text, board_source, result_text, _tz(context),
+                          tg_id, sport=sport)
     mdata, metcon_lines = summarize_filled(blocks, result_text)
     act.extra["metcon"] = mdata
     act.extra["result_blocks"] = blocks
@@ -414,7 +441,7 @@ async def result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             context.user_data["lift_ambiguous"] = ambiguous
         else:
             botdb.insert_activity(con, act, tg_id)
-            if act.sport == Sport.CROSSFIT and any(c.isdigit() for c in context.user_data["result"]):
+            if act.sport in BOARD_SPORTS and any(c.isdigit() for c in context.user_data["result"]):
                 if vision.has_vision() and access.llm_quota_consume(update.effective_user.id, con):
                     parsed = vision.parse_lifts(context.user_data["result"])
                     results, ambiguous = botdb.split_lifts(con, parsed or [])
@@ -447,18 +474,7 @@ async def result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return BODYWEIGHT
 
 
-def _parse_lift_lines(text: str):
-    out = []
-    for line in (text or "").splitlines():
-        line = line.strip()
-        m = re.search(r"\d", line)
-        if not m or m.start() == 0:
-            continue
-        movement = line[:m.start()].strip()
-        parsed = parse_lift(line[m.start():])
-        if movement and parsed:
-            out.append({"movement": movement, "weight_kg": parsed[0], "reps": parsed[1]})
-    return out
+from tj.analysis.parse_input import parse_lift_lines as _parse_lift_lines  # noqa: E402,F401  реэкспорт
 
 
 async def _ask_bodyweight(message, lang: str) -> None:
@@ -586,7 +602,8 @@ def handler() -> ConversationHandler:
             ],
             BOARD_ENGINE: [CallbackQueryHandler(board_engine, pattern=r"^beng:")],
             BOARD_CONFIRM: [CallbackQueryHandler(board_confirm, pattern=r"^bconf:")],
-            RESULT: [MessageHandler(not_menu_text(), result)],
+            RESULT: [MessageHandler(not_menu_text(), result),
+                     CallbackQueryHandler(results_help, pattern=r"^reshelp$")],
             MAX_CONFIRM: [
                 CallbackQueryHandler(max_ok, pattern=r"^max:ok$"),
                 CallbackQueryHandler(max_edit, pattern=r"^max:edit$"),

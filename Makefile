@@ -1,4 +1,4 @@
-.PHONY: setup run test
+.PHONY: setup run test web
 
 # One-command local setup: virtualenv + all dependencies.
 setup:
@@ -12,3 +12,7 @@ run:
 # Run the test suite.
 test:
 	PYTHONPATH=src .venv/bin/python -m pytest -p no:randomly -q
+
+# Build the PWA (web/) into src/tjapp/static/app/ (build artifact, not committed).
+web:
+	cd web && npm ci && npm run build

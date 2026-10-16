@@ -17,10 +17,32 @@ def test_seed_standards_idempotent():
     ps1 = con.execute("SELECT COUNT(*) FROM perf_standards").fetchone()[0]
     botdb.seed_standards(con)
     n2 = con.execute("SELECT COUNT(*) FROM disciplines").fetchone()[0]
-    assert n1 == n2 and n1 == 16
-    assert ps1 == 16 * 5 * 2
+    assert n1 == n2 and n1 == 36        # 13 лифтов + 23 бенчмарка
+    assert ps1 == 36 * 5 * 2
     row = con.execute("SELECT * FROM disciplines WHERE id='deadlift'").fetchone()
     assert row["name_ru"] == "Становая" and row["basis"] == "bw_ratio"
+
+
+def test_seed_standards_column_order_independent():
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    botdb.init_schema(con)
+    con.execute("DROP TABLE disciplines")
+    con.execute(
+        'CREATE TABLE disciplines ("id" TEXT PRIMARY KEY, "name_ru" TEXT, "kind" TEXT, '
+        '"unit" TEXT, "better" TEXT, "basis" TEXT, "ontology" TEXT, "order_idx" INTEGER)')
+    con.execute('ALTER TABLE disciplines ADD COLUMN "name_en" TEXT')
+    botdb.seed_standards(con)
+    kinds = {r["kind"] for r in con.execute("SELECT kind FROM disciplines").fetchall()}
+    assert kinds == {"lift", "benchmark"}, kinds
+    units = {r["unit"] for r in con.execute("SELECT unit FROM disciplines").fetchall()}
+    assert units == {"kg", "rounds", "time"}, units
+    row = con.execute("SELECT * FROM disciplines WHERE id='thruster'").fetchone()
+    assert row["kind"] == "lift"
+    assert row["unit"] == "kg"
+    assert row["ontology"] == "thruster"
+    assert row["name_en"] == "Thruster"
+    assert row["order_idx"] == 5
 
 
 def test_add_and_best_result_lift():

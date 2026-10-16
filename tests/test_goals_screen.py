@@ -18,12 +18,12 @@ def test_screen_shape_with_one_lift():
     botdb.add_goal(con, tg_id=1, kind="numeric", discipline="deadlift",
                    target_value="140", metric="kg", title="Становая 140")
     data = goals_screen_data(con, tg_id=1, sex="m", bodyweight=79)
-    assert data["overall"]["assessed"] == 1 and data["overall"]["total"] == 16
+    assert data["overall"]["assessed"] == 1 and data["overall"]["total"] == 36
     dl = next(d for d in data["lifts"] if d["id"] == "deadlift")
     assert dl["has_data"] is True and dl["level"] == "Любитель"
     empty = next(d for d in data["lifts"] if d["id"] == "back_squat")
     assert empty["has_data"] is False
-    assert len(data["benchmarks"]) == 5
+    assert len(data["benchmarks"]) == 23
     assert data["goals"][0]["progress"]["pct"] == 93
 
 

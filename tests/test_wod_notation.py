@@ -101,3 +101,33 @@ def test_percent_range_is_not_scheme():
 
 def test_weight_ramp_line_is_not_scheme():
     assert parse_notation("становая 100-110-130") is None          # раскладка веса, не схема
+
+
+def test_parse_scheme_types():
+    from tj.analysis.wod_notation import parse_scheme
+    assert parse_scheme("7-5-3") == [7, 5, 3]
+    assert parse_scheme("21 - 15 - 9") == [21, 15, 9]
+    assert parse_scheme([10, 8, 6]) == [10, 8, 6]
+    assert parse_scheme(["7", "5"]) == [7, 5]
+    assert parse_scheme("7-5-3 Взятие и толчок / 4-3-2 Bar Muscle-Up") is None
+    assert parse_scheme("80%") is None
+    assert parse_scheme("7") is None
+    assert parse_scheme([]) is None
+    assert parse_scheme([21, "повт"]) is None
+    assert parse_scheme(None) is None
+    assert parse_scheme(True) is None
+
+
+def test_parse_scheme_nonfinite_floats():
+    from tj.analysis.wod_notation import parse_scheme
+    assert parse_scheme([float("nan"), 15, 9]) is None
+    assert parse_scheme([21, float("inf"), 9]) is None
+    assert parse_scheme([21, float("-inf")]) is None
+    assert parse_scheme([21.0, 15.0, 9.0]) == [21, 15, 9]
+
+
+def test_parse_scheme_strips_leading_numbering():
+    from tj.analysis.wod_notation import parse_scheme
+    assert parse_scheme("1. 21-15-9") == [21, 15, 9]
+    assert parse_scheme("3) 10-8-6") == [10, 8, 6]
+    assert parse_scheme("- 7-5-3") == [7, 5, 3]

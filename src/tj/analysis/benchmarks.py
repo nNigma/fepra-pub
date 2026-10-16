@@ -41,6 +41,10 @@ NAMES = {
     "kb_swing": "махи гирей", "overhead_squat": "присед над головой",
     "shoulder_press": "жим стоя", "toes_to_bar": "носки к перекладине",
     "burpee": "бёрпи", "box_step_up": "зашагивания на тумбу",
+    "wall_ball": "броски мяча", "box_jump": "запрыгивания на тумбу",
+    "muscle_up": "выход силой", "squat_snatch": "рывок в сед", "row": "гребля",
+    "bench_press": "жим лёжа", "pistol": "пистолетик", "clean_floor": "взятие с пола",
+    "push_press": "жимовой швунг",
 }
 
 

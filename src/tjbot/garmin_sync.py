@@ -6,6 +6,9 @@
 from __future__ import annotations
 
 import json
+import os
+import random
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -175,6 +178,50 @@ def sync_history(db_path, tg_id, tokenstore, days: int = 60,
     upto = upto or date.today()
     return sync_recent(db_path, tg_id, tokenstore, upto=upto,
                        start=upto - timedelta(days=days))
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return max(0.0, float(os.environ.get(name, default)))
+    except ValueError:
+        return default
+
+
+def is_rate_limited(exc: Exception) -> bool:
+    return type(exc).__name__ == "GarminConnectTooManyRequestsError" or "429" in str(exc)
+
+
+def sync_all(db_path, accounts, sleep=time.sleep, rand=random.uniform, log=None) -> list[dict]:
+    """Крон-прогон по пользователям с ОДНОГО IP: пауза между пользователями
+    (FEPRA_SYNC_PAUSE_MIN/MAX, по умолчанию 20–60 с) и backoff при 429
+    (FEPRA_SYNC_429_BACKOFF, 300 с, удваивается, FEPRA_SYNC_429_RETRIES=2 повтора).
+    accounts — [(tg_id, email, status), …]. -> [{tg_id, ok, …}, …] для garmin_alerts.apply."""
+    from . import db as botdb
+    lo = _env_float("FEPRA_SYNC_PAUSE_MIN", 20.0)
+    hi = max(lo, _env_float("FEPRA_SYNC_PAUSE_MAX", 60.0))
+    backoff = _env_float("FEPRA_SYNC_429_BACKOFF", 300.0)
+    retries = int(_env_float("FEPRA_SYNC_429_RETRIES", 2))
+    out = []
+    for i, (tg_id, _email, _status) in enumerate(accounts):
+        if i and hi > 0:
+            sleep(rand(lo, hi))
+        attempt = 0
+        while True:
+            try:
+                res = sync_recent(db_path, tg_id, botdb.garmin_tokenstore(tg_id))
+                out.append({"tg_id": tg_id, "ok": True, **res})
+                break
+            except Exception as e:
+                if is_rate_limited(e) and attempt < retries:
+                    wait = backoff * (2 ** attempt)
+                    attempt += 1
+                    if log:
+                        log(f"[sync] {tg_id}: 429, ждём {wait:.0f}с (попытка {attempt}/{retries})")
+                    sleep(wait)
+                    continue
+                out.append({"tg_id": tg_id, "ok": False, "error": type(e).__name__})
+                break
+    return out
 
 
 def backfill_hr_series(db_path, tg_id, tokenstore, root: Path | None = None) -> dict:

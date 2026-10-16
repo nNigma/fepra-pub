@@ -11,6 +11,7 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
 from tj import i18n
 from tj.analysis import activity_stats
 
+from .. import access
 from .. import db as botdb
 from ..access import add_user, is_admin, load_admins, load_allow, remove_user
 from . import menu, pro
@@ -19,6 +20,10 @@ from .menu import show_menu
 BTN_ADD_USER = "➕ Добавить в бота"
 BTN_DEL_USER = "➖ Удалить из бота"
 ADD = range(1)[0]
+GYM_ADD = range(1)[0]
+COACH_ID, COACH_GYM = range(2)
+GYM_NAME_LIMIT = 25
+_RESERVED_GYMS = {"other", "solo"}
 
 _PERIOD_DAYS = {"7": 7, "30": 30}
 
@@ -27,6 +32,7 @@ def admin_kb(lang: str = "ru") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [[i18n.t("btn.admin_add_user", lang), i18n.t("btn.admin_del_user", lang)],
          [i18n.t("btn.admin_stats", lang), i18n.t("btn.pro", lang)],
+         [i18n.t("btn.admin_gyms", lang)],
          [i18n.t("btn.admin_review", lang)],
          [i18n.t("btn.back", lang)]],
         resize_keyboard=True)
@@ -185,6 +191,167 @@ async def del_do(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(i18n.t("admin.user_removed", lang, tg_id=uid))
 
 
+def _gyms_text(con, lang: str) -> str:
+    counts = {r["gym"]: r["n"] for r in con.execute(
+        'SELECT "gym", COUNT(*) AS n FROM users GROUP BY "gym"')}
+    lines = [i18n.t("admin.gyms_header", lang)]
+    for g in botdb.list_gyms(con):
+        lines.append(i18n.t("admin.gym_line", lang, name=g["name"], n=counts.get(g["name"], 0)))
+    return "\n".join(lines)
+
+
+def _gym_name_error(con, name: str) -> str | None:
+    if not name or "\n" in name:
+        return "admin.gym_name_invalid"
+    if len(name) > GYM_NAME_LIMIT or len(f"gym:{name}".encode()) > 64:
+        return "admin.gym_name_too_long"
+    if name.casefold() in _RESERVED_GYMS:
+        return "admin.gym_name_reserved"
+    if botdb.gym_exists(con, name):
+        return "admin.gym_exists"
+    return None
+
+
+async def gyms_open(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    lang = await _lang_for(context, uid)
+    if not is_admin(uid):
+        await update.effective_message.reply_text(i18n.t("admin.only_admin", lang))
+        return
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        text = _gyms_text(con, lang)
+    finally:
+        con.close()
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("admin.gym_add_btn", lang), callback_data="gymadd")],
+        [InlineKeyboardButton(i18n.t("admin.gym_coaches_btn", lang), callback_data="coaches")],
+    ])
+    await update.effective_message.reply_text(text, reply_markup=kb)
+
+
+async def gym_add_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    lang = await _lang_for(context, q.from_user.id)
+    if not is_admin(q.from_user.id):
+        await q.answer(i18n.t("admin.only_admin", lang), show_alert=True)
+        return ConversationHandler.END
+    context.user_data["lang"] = lang
+    await q.answer()
+    await update.effective_message.reply_text(i18n.t("admin.ask_gym_name", lang))
+    return GYM_ADD
+
+
+async def gym_add_take(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "ru")
+    name = (update.effective_message.text or "").strip()
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        err = _gym_name_error(con, name)
+        if err:
+            await update.effective_message.reply_text(i18n.t(err, lang, limit=GYM_NAME_LIMIT))
+            return GYM_ADD
+        botdb.add_gym(con, name)
+    finally:
+        con.close()
+    await update.effective_message.reply_text(
+        i18n.t("admin.gym_added", lang, name=name), reply_markup=admin_kb(lang))
+    return ConversationHandler.END
+
+
+def _coach_label(nick_by_id: dict, tg_id: int) -> str:
+    nick = nick_by_id.get(tg_id)
+    return f"{nick} ({tg_id})" if nick else str(tg_id)
+
+
+def _coaches_text(con, lang: str) -> str:
+    coaches = access.load_coaches()
+    if not coaches:
+        return i18n.t("admin.coaches_empty", lang)
+    rows = con.execute('SELECT "tg_id","nick" FROM users').fetchall()
+    nick_by_id = {int(r["tg_id"]): r["nick"] for r in rows if r["nick"]}
+    lines = [i18n.t("admin.coach_line", lang, label=_coach_label(nick_by_id, tg_id), gym=gym)
+             for tg_id, gym in sorted(coaches.items())]
+    return i18n.t("admin.coaches_header", lang, lines="\n".join(lines))
+
+
+async def coaches_open(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    lang = await _lang_for(context, q.from_user.id)
+    if not is_admin(q.from_user.id):
+        await q.answer(i18n.t("admin.only_admin", lang), show_alert=True)
+        return
+    await q.answer()
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        text = _coaches_text(con, lang)
+        rows = con.execute('SELECT "tg_id","nick" FROM users').fetchall()
+    finally:
+        con.close()
+    nick_by_id = {int(r["tg_id"]): r["nick"] for r in rows if r["nick"]}
+    kb = [[InlineKeyboardButton(i18n.t("admin.coach_grant_btn", lang), callback_data="coach:add")]]
+    for tg_id in sorted(access.load_coaches()):
+        kb.append([InlineKeyboardButton(
+            i18n.t("admin.coach_revoke_btn", lang, label=_coach_label(nick_by_id, tg_id)),
+            callback_data=f"coachrm:{tg_id}")])
+    await q.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb))
+
+
+async def coach_rm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    lang = await _lang_for(context, q.from_user.id)
+    if not is_admin(q.from_user.id):
+        await q.answer(i18n.t("admin.only_admin", lang), show_alert=True)
+        return
+    access.remove_coach(int(q.data.split(":", 1)[1]))
+    await q.answer()
+    await q.edit_message_text(i18n.t("admin.coach_revoked", lang))
+
+
+async def coach_add_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    lang = await _lang_for(context, q.from_user.id)
+    if not is_admin(q.from_user.id):
+        await q.answer(i18n.t("admin.only_admin", lang), show_alert=True)
+        return ConversationHandler.END
+    context.user_data["lang"] = lang
+    await q.answer()
+    await update.effective_message.reply_text(i18n.t("admin.coach_ask_id", lang))
+    return COACH_ID
+
+
+async def coach_add_take(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "ru")
+    txt = (update.effective_message.text or "").strip()
+    if not txt.isdigit():
+        await update.effective_message.reply_text(i18n.t("admin.need_number", lang))
+        return COACH_ID
+    context.user_data["coach_id"] = int(txt)
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        gyms = botdb.list_gyms(con)
+    finally:
+        con.close()
+    kb = [[InlineKeyboardButton(g["name"], callback_data=f"cg:{g['name']}")] for g in gyms]
+    await update.effective_message.reply_text(
+        i18n.t("admin.coach_pick_gym", lang), reply_markup=InlineKeyboardMarkup(kb))
+    return COACH_GYM
+
+
+async def coach_pick_gym(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    lang = context.user_data.get("lang", "ru")
+    gym = q.data.split(":", 1)[1]
+    tg_id = context.user_data.pop("coach_id", None)
+    if tg_id is None:
+        await q.answer()
+        return ConversationHandler.END
+    access.add_coach(tg_id, gym)
+    await q.answer()
+    await q.edit_message_text(i18n.t("admin.coach_granted", lang, tg_id=tg_id, gym=gym))
+    return ConversationHandler.END
+
+
 def _review_report(res: list[dict], lang: str) -> str:
     lines = [i18n.t("admin.review_done", lang)]
     for u in res:
@@ -202,7 +369,7 @@ def _review_report(res: list[dict], lang: str) -> str:
 
 async def review_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """«Разбор полётов»: принудительный прогон авторазборов по всем Pro, в фоне.
-    claude-вызовы сериализуются общим файловым локом (не столкнётся с кроном)."""
+    Текстовые вызовы — через llm.text_complete (agent/claude → Gemini)."""
     import asyncio
 
     from tj import llm
@@ -214,8 +381,8 @@ async def review_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not is_admin(uid):
         await update.effective_message.reply_text(i18n.t("admin.only_admin", lang))
         return
-    if not llm.has_llm():
-        await update.effective_message.reply_text(i18n.t("admin.review_no_claude", lang))
+    if not llm.has_text_llm():
+        await update.effective_message.reply_text(i18n.t("admin.review_no_llm", lang))
         return
     if context.bot_data.get("review_running"):
         await update.effective_message.reply_text(i18n.t("admin.review_busy", lang))
@@ -246,10 +413,34 @@ def _add_conv() -> ConversationHandler:
     )
 
 
+def _gym_conv() -> ConversationHandler:
+    return ConversationHandler(
+        entry_points=[CallbackQueryHandler(gym_add_entry, pattern=r"^gymadd$")],
+        states={GYM_ADD: [MessageHandler(menu.not_menu_text(), gym_add_take)]},
+        fallbacks=menu.wizard_fallbacks(),
+    )
+
+
+def _coach_conv() -> ConversationHandler:
+    return ConversationHandler(
+        entry_points=[CallbackQueryHandler(coach_add_entry, pattern=r"^coach:add$")],
+        states={
+            COACH_ID: [MessageHandler(menu.not_menu_text(), coach_add_take)],
+            COACH_GYM: [CallbackQueryHandler(coach_pick_gym, pattern=r"^cg:")],
+        },
+        fallbacks=menu.wizard_fallbacks(),
+    )
+
+
 def register(app) -> None:
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin")), open_admin))
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.back")), back))
     app.add_handler(_add_conv())
+    app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin_gyms")), gyms_open))
+    app.add_handler(_gym_conv())
+    app.add_handler(CallbackQueryHandler(coaches_open, pattern=r"^coaches$"))
+    app.add_handler(_coach_conv())
+    app.add_handler(CallbackQueryHandler(coach_rm, pattern=r"^coachrm:"))
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin_del_user")), del_list))
     app.add_handler(CallbackQueryHandler(del_do, pattern=r"^delu:"))
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.admin_stats")), stats_open))

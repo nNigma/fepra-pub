@@ -14,6 +14,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "btn.edit": {"ru": "✏️ Редактировать тренировку", "en": "✏️ Edit workout"},
     "btn.comp": {"ru": "➕ Соревнование", "en": "➕ Competition"},
     "btn.add_result": {"ru": "Добавить результат", "en": "Add result"},
+    "btn.enter_pm": {"ru": "✍️ Ввести ПМ", "en": "✍️ Enter 1RM"},
     "btn.add_workout": {"ru": "Добавить тренировку", "en": "Add workout"},
     "btn.comp_summary": {"ru": "Старты", "en": "Events"},
     "btn.leaderboard": {"ru": "🏆 Лидерборд", "en": "🏆 Leaderboard"},
@@ -121,6 +122,24 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.astro_off": {"ru": "🔮 Гадание выключено.", "en": "🔮 Fortune disabled."},
     "profile.btn_goal": {"ru": "🎯 Цель питания: {goal}", "en": "🎯 Nutrition goal: {goal}"},
     "profile.btn_city": {"ru": "🏙 Город: {city}", "en": "🏙 City: {city}"},
+    "profile.btn_edit": {"ru": "✏️ Изменить профиль", "en": "✏️ Edit profile"},
+    "profile.edit_pick": {"ru": "Что изменить?", "en": "What to change?"},
+    "profile.edit_nick": {"ru": "Ник: {v}", "en": "Nick: {v}"},
+    "profile.edit_height": {"ru": "Рост: {v} см", "en": "Height: {v} cm"},
+    "profile.edit_weight": {"ru": "Вес: {v} кг", "en": "Weight: {v} kg"},
+    "profile.edit_sex": {"ru": "Пол: {v}", "en": "Sex: {v}"},
+    "profile.edit_age": {"ru": "Возраст: {v}", "en": "Age: {v}"},
+    "profile.edit_gym": {"ru": "Зал: {v}", "en": "Gym: {v}"},
+    "profile.edit_done": {"ru": "✅ Готово", "en": "✅ Done"},
+    "profile.edit_ask_nick": {"ru": "Новый ник?", "en": "New nickname?"},
+    "profile.edit_ask_height": {"ru": "Новый рост, см?", "en": "New height, cm?"},
+    "profile.edit_ask_weight": {"ru": "Новый вес, кг?", "en": "New weight, kg?"},
+    "profile.edit_ask_age": {"ru": "Новый возраст, лет?", "en": "New age, years?"},
+    "profile.edit_ask_sex": {"ru": "Пол?", "en": "Sex?"},
+    "profile.edit_ask_gym": {"ru": "Где занимаешься?", "en": "Where do you train?"},
+    "profile.edit_nick_invalid": {"ru": "Ник не может быть пустым.", "en": "Nickname can't be empty."},
+    "profile.edit_saved": {"ru": "Сохранил.", "en": "Saved."},
+    "profile.edit_closed": {"ru": "Готово.", "en": "Done."},
     "goal.cut": {"ru": "Сушка", "en": "Cut"},
     "goal.maintain": {"ru": "Поддержание", "en": "Maintain"},
     "goal.bulk": {"ru": "Масса", "en": "Bulk"},
@@ -142,6 +161,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "garmin.disconnected": {"ru": "Garmin отключён. Данные сохранены.", "en": "Garmin disconnected. Data kept."},
     "app.not_running": {"ru": "Приложение пока не запущено. Подними сервер и тоннель.",
                          "en": "The app isn't running yet. Start the server and tunnel."},
+    "app.open_analytics_btn": {"ru": "Открыть аналитику", "en": "Open analytics"},
     "app.open_summary_btn": {"ru": "Открыть сводку", "en": "Open summary"},
     "app.open_summary_intro": {"ru": "Готовность и нагрузка:", "en": "Readiness and load:"},
     "app.open_workouts_btn": {"ru": "Открыть тренировки", "en": "Open workouts"},
@@ -272,11 +292,35 @@ STRINGS: dict[str, dict[str, str]] = {
     "onboarding.sex_f_label": {"ru": "женский", "en": "female"},
     "onboarding.ask_age": {"ru": "Возраст, лет? (для зон пульса)", "en": "Age, years? (for heart-rate zones)"},
     "onboarding.age_invalid": {"ru": "Числом, лет. Например 36.", "en": "As a number, in years. For example 36."},
-    "onboarding.btn_gym_universe": {"ru": "Universe (по умолчанию)", "en": "Universe (default)"},
+    "onboarding.btn_gym_default": {"ru": "{name} (по умолчанию)", "en": "{name} (default)"},
     "onboarding.btn_gym_other": {"ru": "Другой зал", "en": "Other gym"},
     "onboarding.btn_gym_solo": {"ru": "Одиночка", "en": "Solo"},
     "onboarding.ask_gym": {"ru": "Где занимаешься?", "en": "Where do you train?"},
     "onboarding.gym_chosen": {"ru": "Зал: {gym}", "en": "Gym: {gym}"},
+    "onboarding.results_guide": {
+        "ru": "📝 Как вносить результаты после тренировки\n\n"
+              "- Штанга - общий вес: гриф + блины (60×5 = 60 кг)\n"
+              "- Гантели и гири - суммарный вес пары: 2×22.5 → пиши 45 (одна - как есть)\n"
+              "- Wall ball - вес мяча, как на доске\n"
+              "- Гимнастика - только повторы, без веса\n"
+              "- Байк и гребля - ккал по дисплею\n"
+              "- For time - время мм:сс; не уложился в кэп - сколько повторов успел\n"
+              "- AMRAP - полные круги + повторы неполного круга отдельно\n"
+              "- Силовая - каждый раунд отдельно: вес×повторы (60×5)\n"
+              "- Не RX - допиши «scaled» к результату",
+        "en": "📝 How to enter workout results\n\n"
+              "- Barbell - total weight: bar + plates (60×5 = 60 kg)\n"
+              "- Dumbbells and kettlebells - combined weight of the pair: 2×22.5 → write 45 (single - as is)\n"
+              "- Wall ball - ball weight as on the board\n"
+              "- Gymnastics - reps only, no weight\n"
+              "- Bike and row - kcal from the display\n"
+              "- For time - time mm:ss; missed the cap - how many reps you got\n"
+              "- AMRAP - full rounds + extra reps of the unfinished round\n"
+              "- Strength - each round separately: weight×reps (60×5)\n"
+              "- Not RX - add 'scaled' to the result",
+    },
+    "onboarding.btn_guide_ok": {"ru": "👌 Понятно", "en": "👌 Got it"},
+    "record.btn_results_help": {"ru": "❓ Как вносить результаты", "en": "❓ How to enter results"},
     "record.ask_date": {"ru": "Дата тренировки?", "en": "Workout date?"},
     "record.btn_today": {"ru": "Сегодня", "en": "Today"},
     "record.btn_yesterday": {"ru": "Вчера", "en": "Yesterday"},
@@ -288,6 +332,8 @@ STRINGS: dict[str, dict[str, str]] = {
                              "en": "Didn't get that. Format: YYYY-MM-DD or DD.MM"},
     "record.ask_sport": {"ru": "Тип?", "en": "Type?"},
     "record.btn_crossfit": {"ru": "Кроссфит", "en": "Crossfit"},
+    "record.btn_weightlifting": {"ru": "ТА", "en": "Weightlifting"},
+    "record.btn_hyrox": {"ru": "Hyrox", "en": "Hyrox"},
     "record.btn_run": {"ru": "Бег", "en": "Run"},
     "record.btn_bike": {"ru": "Вело", "en": "Bike"},
     "record.sport_chosen": {"ru": "Тип: {sport}", "en": "Type: {sport}"},
@@ -343,9 +389,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Checking the results template… (up to 30s)",
     },
     "record.fill_results_template": {
-        "ru": "Заполни результаты (вес — кг, время — мм:сс):\n\n{tmpl}\n\n"
+        "ru": "Заполни результаты (вес — кг, время — мм:сс):\n\n"
               "Впиши значения и пришли одним сообщением. Добавь RPE (например «RPE 7»).",
-        "en": "Fill in the results (weight in kg, time as mm:ss):\n\n{tmpl}\n\n"
+        "en": "Fill in the results (weight in kg, time as mm:ss):\n\n"
               "Enter the values and send in one message. Add RPE (e.g. 'RPE 7').",
     },
     "record.workout_summary": {"ru": "Записал: {sport}, {date}", "en": "Logged: {sport}, {date}"},
@@ -377,7 +423,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "bw.ask_date": {"ru": "За какую дату записать вес?", "en": "Which date to log weight for?"},
     "bw.ask_kg": {"ru": "Вес тела (кг)?", "en": "Bodyweight (kg)?"},
     "bw.saved": {"ru": "Записал вес {kg:g} кг на {date}.", "en": "Logged {kg:g} kg for {date}."},
-    "btn.result": {"ru": "➕ Результат", "en": "➕ Result"},
     "addresult.btn_today": {"ru": "Сегодня", "en": "Today"},
     "addresult.btn_yesterday": {"ru": "Вчера", "en": "Yesterday"},
     "addresult.btn_other_date": {"ru": "Другая", "en": "Other"},
@@ -403,9 +448,9 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "addresult.accepted": {"ru": "Принято.", "en": "Accepted."},
     "addresult.fill_results_template": {
-        "ru": "Заполни результаты (вес — кг, время — мм:сс):\n\n{tmpl}\n\n"
+        "ru": "Заполни результаты (вес — кг, время — мм:сс):\n\n"
               "Впиши значения и пришли одним сообщением. Добавь RPE (например «RPE 7»).",
-        "en": "Fill in the results (weight in kg, time as mm:ss):\n\n{tmpl}\n\n"
+        "en": "Fill in the results (weight in kg, time as mm:ss):\n\n"
               "Enter the values and send in one message. Add RPE (e.g. 'RPE 7').",
     },
     "addresult.no_program_admin": {
@@ -596,8 +641,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "club.yesterday": {"ru": "Вчера", "en": "Yesterday"},
     "club.other_date": {"ru": "Другая дата", "en": "Other date"},
     "club.other": {"ru": "Другая", "en": "Other"},
-    "club.program_header": {"ru": "Программа Universe на {day}:\n\n{text}",
-                             "en": "Universe program for {day}:\n\n{text}"},
+    "club.program_header": {"ru": "Программа {gym} на {day}:\n\n{text}",
+                             "en": "{gym} program for {day}:\n\n{text}"},
     "club.no_program_last": {"ru": "На сегодня программы нет. Последняя была {day}.",
                               "en": "No program for today. The last one was {day}."},
     "club.no_program_yet": {"ru": "Программ зала пока нет.", "en": "No gym programs yet."},
@@ -612,7 +657,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "club.no_program_on_date": {"ru": "На {day} программы нет.", "en": "No program on {day}."},
     "club.date_invalid": {"ru": "Не разобрал. Формат ГГГГ-ММ-ДД или ДД.ММ",
                            "en": "Didn't get that. Format: YYYY-MM-DD or DD.MM"},
-    "club.admin_only": {"ru": "Только для админа.", "en": "Admins only."},
+    "club.manage_only": {"ru": "Только админ или тренер зала.",
+                          "en": "Admins or the gym coach only."},
+    "btn.club_athletes": {"ru": "👥 Атлеты зала", "en": "👥 Gym athletes"},
+    "club.athletes_header": {"ru": "Атлеты зала {gym} (тренировок за 30 дней):\n{lines}",
+                              "en": "{gym} athletes (workouts in 30 days):\n{lines}"},
+    "club.athletes_line": {"ru": "• {name}: {n}", "en": "• {name}: {n}"},
+    "club.athletes_empty": {"ru": "В зале пока нет участников.",
+                             "en": "No members in this gym yet."},
     "club.ask_add_date": {"ru": "Программа на какую дату?", "en": "Program for which date?"},
     "club.ask_edit_date": {"ru": "Редактировать программу на какую дату?",
                             "en": "Edit the program for which date?"},
@@ -630,8 +682,8 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "en": "Send the workout program as text or a photo."},
     "club.empty_send_again": {"ru": "Пусто. Пришли текст программы или фото.",
                                "en": "Empty. Send the program text or a photo."},
-    "club.program_body": {"ru": "Программа:\n\n{annotated}",
-                           "en": "Program:\n\n{annotated}"},
+    "club.program_word": {"ru": "Программа", "en": "Program"},
+    "club.program_body": {"ru": "{annotated}", "en": "{annotated}"},
     "club.movements_line": {"ru": "Движения: {names}",
                              "en": "Movements: {names}"},
     "club.dash": {"ru": "—", "en": "-"},
@@ -648,8 +700,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Проверяю шаблон результатов… (до полминуты)",
         "en": "Checking the results template… (up to 30s)",
     },
-    "club.program_saved": {"ru": "Программа Universe на {day} сохранена.",
-                            "en": "Universe program for {day} saved."},
+    "club.program_saved": {"ru": "Программа {gym} на {day} сохранена.",
+                            "en": "{gym} program for {day} saved."},
     "club.send_fixed_board": {"ru": "Пришли фото доски или исправленный текст программы.",
                                "en": "Send a photo of the board or the corrected program text."},
     "club.btn_add_move": {"ru": "➕ Добавить движение", "en": "➕ Add movement"},
@@ -686,6 +738,32 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin.user_removed": {"ru": "Убран из бота: {tg_id}", "en": "Removed from bot: {tg_id}"},
     "btn.pro": {"ru": "Pro", "en": "Pro"},
     "btn.admin_stats": {"ru": "📊 Статистика", "en": "📊 Stats"},
+    "btn.admin_gyms": {"ru": "🏟 Залы", "en": "🏟 Gyms"},
+    "admin.gyms_header": {"ru": "Залы (участников):", "en": "Gyms (members):"},
+    "admin.gym_line": {"ru": "• {name} - {n}", "en": "• {name} - {n}"},
+    "admin.gym_coaches_btn": {"ru": "🎓 Тренеры", "en": "🎓 Coaches"},
+    "admin.coaches_header": {"ru": "Тренеры:\n{lines}", "en": "Coaches:\n{lines}"},
+    "admin.coach_line": {"ru": "• {label} - {gym}", "en": "• {label} - {gym}"},
+    "admin.coaches_empty": {"ru": "Тренеров пока нет.", "en": "No coaches yet."},
+    "admin.coach_grant_btn": {"ru": "➕ Назначить тренера", "en": "➕ Appoint a coach"},
+    "admin.coach_revoke_btn": {"ru": "✖ Снять {label}", "en": "✖ Remove {label}"},
+    "admin.coach_ask_id": {"ru": "Telegram ID тренера?", "en": "Coach's Telegram ID?"},
+    "admin.coach_pick_gym": {"ru": "Какой зал?", "en": "Which gym?"},
+    "admin.coach_granted": {"ru": "Тренер {tg_id} назначен в {gym}.",
+                             "en": "Coach {tg_id} appointed to {gym}."},
+    "admin.coach_revoked": {"ru": "Тренер снят.", "en": "Coach removed."},
+    "admin.gym_add_btn": {"ru": "➕ Добавить зал", "en": "➕ Add gym"},
+    "admin.ask_gym_name": {"ru": "Название нового зала:", "en": "New gym name:"},
+    "admin.gym_name_invalid": {"ru": "Название - одна непустая строка. Попробуй еще раз:",
+                               "en": "Name must be a single non-empty line. Try again:"},
+    "admin.gym_name_too_long": {"ru": "Слишком длинно, максимум {limit} символов. Попробуй еще раз:",
+                                "en": "Too long, max {limit} characters. Try again:"},
+    "admin.gym_name_reserved": {"ru": "Это служебное имя, его занять нельзя. Попробуй еще раз:",
+                                "en": "That name is reserved. Try again:"},
+    "admin.gym_exists": {"ru": "Такой зал уже есть. Попробуй еще раз:",
+                         "en": "That gym already exists. Try again:"},
+    "admin.gym_added": {"ru": "Зал \"{name}\" создан - теперь он есть в кнопках онбординга.",
+                        "en": "Gym \"{name}\" created - it now shows up in onboarding buttons."},
     "btn.admin_review": {"ru": "🛫 Запустить разбор полётов", "en": "🛫 Run flight review"},
     "admin.review_started": {
         "ru": "Запустил разбор полётов по всем Pro — напишу, когда закончу "
@@ -697,9 +775,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Разбор уже идёт — дождись отчёта.",
         "en": "A review run is already in progress — wait for the report.",
     },
-    "admin.review_no_claude": {
-        "ru": "Claude CLI на этой машине не найден — разбор недоступен.",
-        "en": "Claude CLI not found on this machine — review unavailable.",
+    "admin.review_no_llm": {
+        "ru": "Нет доступного LLM (agent/claude/gemini) — разбор недоступен.",
+        "en": "No LLM available (agent/claude/gemini) — review unavailable.",
     },
     "admin.review_done": {"ru": "Разбор полётов готов:", "en": "Flight review done:"},
     "admin.review_user_line": {
@@ -760,6 +838,73 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Средняя вода {v} л/день — маловато, целься в 2-2.5 л.",
         "en": "Average water {v} l/day — low, aim for 2-2.5 l.",
     },
+    "nutr.adv.kcal_under_week": {
+        "ru": "Недобор калорий: добавь ~{v} ккал в день, чтобы выйти на цель.",
+        "en": "Calorie shortfall: add ~{v} kcal per day to hit target.",
+    },
+    "nutr.adv.kcal_over_week": {
+        "ru": "Перебор калорий: убери ~{v} ккал в день.",
+        "en": "Calorie surplus: cut ~{v} kcal per day.",
+    },
+    "nutr.adv.wk_fiber_g": {
+        "ru": "Клетчатки в среднем {v} г/день — добавь овощей/круп (цель 30 г).",
+        "en": "Fiber averages {v} g/day — add veggies/grains (target 30 g).",
+    },
+    "nutr.adv.wk_sugar_g": {
+        "ru": "Сахара в среднем {v} г/день — режь до 50 г.",
+        "en": "Sugar averages {v} g/day — cut down to 50 g.",
+    },
+    "nutr.adv.wk_sodium_mg": {
+        "ru": "Натрия в среднем {v} мг/день — многовато соли (цель до 2300 мг).",
+        "en": "Sodium averages {v} mg/day — too much salt (target under 2300 mg).",
+    },
+    "nutr.adv.wk_iron_mg": {
+        "ru": "Железа в среднем {v} мг/день — мало (цель 8 мг): красное мясо, гречка.",
+        "en": "Iron averages {v} mg/day — low (target 8 mg): red meat, buckwheat.",
+    },
+    "nutr.adv.wk_calcium_mg": {
+        "ru": "Кальция в среднем {v} мг/день — мало (цель 1000 мг): молочка, кунжут.",
+        "en": "Calcium averages {v} mg/day — low (target 1000 mg): dairy, sesame.",
+    },
+    "nutr.adv.wk_magnesium_mg": {
+        "ru": "Магния в среднем {v} мг/день — мало (цель 400 мг): орехи, зелень.",
+        "en": "Magnesium averages {v} mg/day — low (target 400 mg): nuts, greens.",
+    },
+    "nutr.adv.wk_potassium_mg": {
+        "ru": "Калия в среднем {v} мг/день — мало (цель 3500 мг): картофель, бананы.",
+        "en": "Potassium averages {v} mg/day — low (target 3500 mg): potatoes, bananas.",
+    },
+    "nutr.week.c_kcal_ok": {
+        "ru": "Калории за неделю в норме — среднее держится у цели.",
+        "en": "Weekly calories on target — the average sits right at goal.",
+    },
+    "nutr.week.c_kcal_under": {
+        "ru": "Недобор {v} ккал за неделю (−{p}% от цели).",
+        "en": "{v} kcal under for the week (−{p}% of target).",
+    },
+    "nutr.week.c_kcal_over": {
+        "ru": "Перебор {v} ккал за неделю (+{p}% к цели).",
+        "en": "{v} kcal over for the week (+{p}% of target).",
+    },
+    "nutr.week.c_protein_ok": {
+        "ru": "Белок в порядке: в среднем {v} г/кг.",
+        "en": "Protein is fine: {v} g/kg on average.",
+    },
+    "nutr.week.c_protein_low": {
+        "ru": "Белка мало: в среднем {v} г/кг.",
+        "en": "Protein is low: {v} g/kg on average.",
+    },
+    "nutr.week.c_micro": {
+        "ru": "Хромают: {names}.",
+        "en": "Falling short: {names}.",
+    },
+    "nutr.m.fiber_g": {"ru": "клетчатка", "en": "fiber"},
+    "nutr.m.sugar_g": {"ru": "сахар", "en": "sugar"},
+    "nutr.m.sodium_mg": {"ru": "натрий", "en": "sodium"},
+    "nutr.m.iron_mg": {"ru": "железо", "en": "iron"},
+    "nutr.m.calcium_mg": {"ru": "кальций", "en": "calcium"},
+    "nutr.m.magnesium_mg": {"ru": "магний", "en": "magnesium"},
+    "nutr.m.potassium_mg": {"ru": "калий", "en": "potassium"},
     "q.meal.1": {"ru": "🏆 еда чемпиона", "en": "🏆 champion's meal"},
     "q.meal.2": {"ru": "👌 сойдёт для сельской местности", "en": "👌 decent enough"},
     "q.meal.3": {"ru": "🤡 читмил без повода", "en": "🤡 cheat meal for no reason"},

@@ -60,6 +60,23 @@ def test_block_labeled_summary_wod_and_amrap():
     assert not any(l.startswith("AMRAP") and "8:36" in l for l in lines)  # время НЕ приписано AMRAP
 
 
+def test_summarize_gym_skill_reps():
+    # BUG 2026-07-23: ответ на «выполнено выходов» должен попадать в сводку
+    blocks = [{"format": "other", "header": "Гимнастика", "benchmark": None,
+               "movements": [{"name": "Bar Muscle-Up"}]}]
+    text = "Гимнастика:\n  выполнено выходов: 12\n"
+    data, lines = summarize_filled(blocks, text)
+    assert any(l.startswith("Гимнастика") and "12" in l for l in lines)
+
+
+def test_summarize_gym_skill_per_set_rounds():
+    blocks = [{"format": "other", "header": "Гимнастика", "benchmark": None,
+               "movements": [{"name": "Bar Muscle-Up ×5"}]}]
+    text = "Гимнастика:\n  кругов (по 5 выходов): 4\n"
+    data, lines = summarize_filled(blocks, text)
+    assert any(l.startswith("Гимнастика") and "4 кругов" in l for l in lines)
+
+
 def test_summarize_benchmark_and_score():
     blocks = [{"kind": "for_time", "name": "Fran", "benchmark": "Fran"},
               {"kind": "tabata", "name": "Табата"}]

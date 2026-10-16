@@ -1,6 +1,7 @@
 # FePra
 
-Личный тренировочный сервис: **Telegram-бот для ввода + Mini App для аналитики**.
+Личный тренировочный сервис: **Telegram-бот для ввода + Mini App для аналитики**,
+плюс самостоятельное веб-приложение **PWA (beta)** с входом по инвайту и passkey.
 Основной спорт — кроссфит, плюс бег / вело (биометрия с часов Garmin, Samsung,
 Whoop или Apple Watch). Активный анализ для решений: нагрузка (ACWR/TRIMP),
 готовность, прогрессия по уровням, питание, разбор тренировки от ИИ.
@@ -35,7 +36,29 @@ Whoop или Apple Watch). Активный анализ для решений: 
   через Android-компаньон `android/fepra-connect`), Whoop (OAuth + синк),
   Apple Watch (Health Auto Export → вебхук). Один провайдер на пользователя;
   без часов готовность считается по самооценке.
+- **Программы.** Каталог программ и два шаблона по болгарской системе: веса
+  считаются от твоих максимумов, стартовый уровень и тест-сессия, экран «у помоста»
+  с таймером отдыха и записью подходов.
+- **Залы и роли.** Несколько залов со своей программой дня и лидербордом; роли
+  admin / тренер зала / Pro / атлет хранятся в БД.
 - **Мультиюзер** (режим тренера: админ видит всех view-only), **локали RU/EN**.
+
+## PWA (beta)
+
+Telegram перестаёт быть обязательным: `web/` — веб-приложение на Vite + TypeScript +
+React, устанавливается на телефон как PWA и ходит в тот же бэкенд через REST.
+
+- Вход: инвайт-ссылка от админа → ник → passkey (Face ID / отпечаток), сессии на сервере.
+- Экраны: сводка, тренировки и запись (фото доски / текст → разбор → форма),
+  питание, цели и ПМ, соревнования, лидерборд, программы, тренер, зал, админка,
+  подключение Garmin.
+- Web Push: напоминания и уведомления (VAPID-ключи в `.env`).
+- Доменная логика вынесена в `tj/services/*` и общая для бота и REST (`tjapp/routes/*`),
+  долгие задачи (распознавание, разборы) идут через очередь `jobs` с поллингом.
+
+**Статус: beta.** Бот пока остаётся основным клиентом и работает на той же БД;
+перевод всех сценариев в PWA и выключение бота ещё не завершены. Контракт API и
+заметки по фазам — в [`docs/pwa/`](./docs/pwa/).
 
 ## Стек и раскладка
 
@@ -48,7 +71,10 @@ src/
 │   │                       #   разбор результатов, narrative, лидерборд, gym-стата
 │   ├── data/               #   standards.json (нормативы), benchmarks.json (WOD Girls/Hero)
 │   ├── ontology.py         #   движения RU/EN → канон (+ маркеры вариантов)
-│   ├── llm.py  i18n.py     #   клиент Gemini; каталог строк RU/EN
+│   ├── services/           #   доменные сервисы (общие для бота и REST): тренировки,
+│   │                       #   питание, цели, программы, залы, auth, push, jobs
+│   ├── migrations/         #   миграции схемы (учёт в schema_migrations)
+│   ├── llm.py  i18n.py     #   клиент Gemini (+ Claude опционально); строки RU/EN
 │   ├── models.py config.py #   каноническая схема; config.toml + .env
 │   └── cli.py + adapters/ vault/ store/   # legacy Obsidian/Garmin-слой (см. ниже)
 ├── tjbot/                  # Telegram-бот (слой ВВОДА)
@@ -59,9 +85,11 @@ src/
 │   ├── vision.py           #   распознавание фото доски/результатов/еды
 │   └── garmin_sync.py whoop_sync.py garmin_connect.py   # per-user синк + MFA-мост
 └── tjapp/                  # FastAPI Mini App (слой ОТЧЁТОВ)
-    ├── api.py auth.py      #   REST + валидация Telegram initData
+    ├── api.py auth.py      #   REST Mini App + валидация Telegram initData
+    ├── routes/ deps.py     #   REST для PWA (автоподхват роутеров), сессии/роли
     ├── ingest.py whoop_oauth.py   # приёмники Samsung/Apple + OAuth-колбэк Whoop
-    └── static/             #   index.html, app.js, body.js, strings.js
+    └── static/             #   Mini App (index.html, app.js, …); app/ — сборка PWA
+web/                        # PWA: Vite + TS + React (сборка → src/tjapp/static/app/)
 ```
 
 Плюс `android/fepra-connect/` — Android-компаньон для Samsung: читает Health
@@ -81,6 +109,15 @@ make run                # Mini App + тоннель + бот — одной ко
 `make run` поднимает uvicorn, запускает cloudflared, кладёт свежий публичный URL в
 `miniapp_url.txt` (бот читает его на лету) и стартует бота. Нужен установленный
 `cloudflared` (macOS: `brew install cloudflared`). Тесты — `make test`.
+
+PWA собирается из `web/` (Node 20+); сборка — артефакт и в git не хранится:
+
+```bash
+make web                # cd web && npm ci && npm run build → src/tjapp/static/app/
+PYTHONPATH=src .venv/bin/python -m tj.services.auth_cli invite --admin   # первая ссылка-инвайт
+```
+
+Разработка фронта с горячей перезагрузкой — [`docs/pwa/web.md`](./docs/pwa/web.md).
 
 ## AI-движок: только Gemini (по умолчанию) или Claude
 
@@ -106,11 +143,20 @@ use_claude = true
 
 ## Прод (постоянный хостинг)
 
-Сервер вне РФ (Gemini API не ходит с росс. IP): systemd-юниты `fepra-bot` +
-`fepra-app`, реверс-прокси **Caddy** (Let's Encrypt HTTPS) на твоём домене
-(например бесплатный `<your>.duckdns.org`) и постоянный `MINIAPP_URL`. Пошаговый гайд
-и готовые шаблоны — [`deploy/README.md`](./deploy/README.md). Обновление — `git pull`
-+ рестарт сервисов; данные (`training.db`, токены, `.env`) не трогаются.
+Подойдёт любой небольшой Linux-хост (VPS или домашний сервер), с которого доступен
+Gemini API (из некоторых регионов, включая РФ, он не работает). Два systemd-юнита:
+`fepra-bot` (polling) и `fepra-app` (uvicorn, Mini App + REST + PWA).
+
+Нужен постоянный публичный HTTPS-адрес — его значение кладётся в `FEPRA_PUBLIC_URL`
+(и `MINIAPP_URL`): от него строятся инвайты, колбэки часов, и он же — relying party для
+passkey, поэтому менять его после регистрации ключей нельзя. Варианты:
+- свой домен + реверс-прокси **Caddy** (Let's Encrypt), шаблон в `deploy/Caddyfile`;
+- без белого IP — туннель (например Tailscale Funnel или именованный Cloudflare Tunnel).
+
+Кроны: `server_sync.py` (синк часов) → `server_review.py` (авторазборы),
+`server_notify.py` (Web Push, раз в час). Пошаговый гайд и шаблоны —
+[`deploy/README.md`](./deploy/README.md). Обновление — `git pull`, `make web`, рестарт
+сервисов; данные (`training.db`, токены, `.env`) не трогаются.
 
 ## Legacy: Obsidian/CLI-слой
 

@@ -7,15 +7,12 @@ from telegram import Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from tj import i18n
+from tj.services.urls import public_link
 from ..access import restricted
 
 
-def _base_url() -> str:
-    return os.environ.get("MINIAPP_URL", "https://your-domain.example.org").rstrip("/")
-
-
 def apk_url() -> str:
-    return os.environ.get("FEPRA_APK_URL") or f"{_base_url()}/fepra-connect.apk"
+    return os.environ.get("FEPRA_APK_URL") or public_link("/fepra-connect.apk")
 
 
 def connect_message(link: str, token: str, lang: str) -> str:
@@ -52,7 +49,7 @@ async def samsung_disconnect_cb(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 def apple_ingest_url() -> str:
-    return os.environ.get("FEPRA_APPLE_URL") or f"{_base_url()}/ingest/apple"
+    return os.environ.get("FEPRA_APPLE_URL") or public_link("/ingest/apple")
 
 
 @restricted

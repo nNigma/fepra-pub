@@ -9,13 +9,11 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from tj import i18n
 from tj.analysis import standards
+from tj.analysis.progression import epley_1rm
 from .. import db as botdb
 
-# family -> [(discipline_id, i18n_label_key)] — порядок кнопок
-FAMILY_VARIANTS = {
-    "snatch": [("squat_snatch", "disambig.snatch_squat"), ("power_snatch", "disambig.snatch_power")],
-    "clean": [("clean_floor", "disambig.clean_floor"), ("hang_clean", "disambig.clean_hang")],
-}
+# family -> [(discipline_id, i18n_label_key)] — общий словарь с сервисами (tj.services.workouts)
+from tj.services.workouts import FAMILY_VARIANTS  # noqa: E402
 _ASK_KEY = {"snatch": "disambig.ask_snatch", "clean": "disambig.ask_clean"}
 
 
@@ -25,10 +23,6 @@ def _lang(context, uid):
         return botdb.user_lang(con, uid)
     finally:
         con.close()
-
-
-def _epley(w, r):
-    return round(w * (1 + r / 30.0), 1)
 
 
 async def _ask_next(update: Update, context) -> None:
@@ -67,7 +61,7 @@ async def on_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     con = botdb.connect(context.bot_data["db_path"])
     try:
         botdb.add_result(con, tg_id=amb["tg_id"], discipline=did, value=item["weight"],
-                         reps=item["reps"], est_1rm=_epley(item["weight"], item["reps"]),
+                         reps=item["reps"], est_1rm=epley_1rm(item["weight"], item["reps"]),
                          source="auto", day=amb["day"], activity_id=amb["activity_id"])
         con.commit()
     finally:

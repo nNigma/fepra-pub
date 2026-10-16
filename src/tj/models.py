@@ -17,10 +17,19 @@ from enum import Enum
 
 class Sport(str, Enum):
     CROSSFIT = "crossfit"
+    WEIGHTLIFTING = "weightlifting"     # тяжёлая атлетика (ТА)
+    HYROX = "hyrox"
     RUN = "run"
     BIKE = "bike"
     SWIM = "swim"
     OTHER = "other"
+
+
+# Спорты «с доской»: программа дня -> шаблон результатов -> максы в уровни.
+# Часы их не различают (strength_training у Garmin -> crossfit), поэтому для
+# слияния ручной записи с биометрией часов они считаются одной семьёй.
+BOARD_SPORTS = frozenset({Sport.CROSSFIT, Sport.WEIGHTLIFTING, Sport.HYROX})
+BOARD_SPORT_VALUES = frozenset(s.value for s in BOARD_SPORTS)
 
 
 class Scaling(str, Enum):

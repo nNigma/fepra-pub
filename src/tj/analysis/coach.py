@@ -10,7 +10,7 @@ from tj import llm
 from tj.analysis import nutrition as nutr
 from tj.analysis.dashboard import summary_data
 from tj.analysis.llm_coach import summary_payload
-from tj.analysis.workouts import recent_workouts
+from tj.analysis.workouts import recent_workouts, sport_counts
 
 _SYS_RU = (
     "Ты — персональный тренер по кроссфиту и фитнесу. Тебе дан JSON-контекст "
@@ -69,14 +69,12 @@ def coach_payload(db_path, tg_id: int, lang: str = "ru",
         hr_max, sex = botdb.profile_hr_sex(con, tg_id)
         u = botdb.get_user(con, tg_id)
         weight = botdb.latest_weight(con, tg_id)
-        sports = [{"sport": r["sport"], "n": r["n"]} for r in con.execute(
-            'SELECT "sport", COUNT(*) AS n FROM activities '
-            'WHERE "tg_id"=? AND "day">=? GROUP BY "sport" ORDER BY n DESC',
-            (tg_id, (today - timedelta(days=60)).isoformat()))]
         nutrition = {"today": _day_nutrition(botdb, con, tg_id, today.isoformat()),
                      "yesterday": _day_nutrition(botdb, con, tg_id, yesterday)}
     finally:
         con.close()
+    sports = sport_counts(db_path, "sqlite", tg_id=tg_id,
+                          since=(today - timedelta(days=60)).isoformat())
     summary = summary_data(db_path, "sqlite", hr_max, sex, today, tg_id=tg_id, lang=lang)
     workouts = [{k: w.get(k) for k in _WK_FIELDS if w.get(k) is not None}
                 for w in recent_workouts(db_path, "sqlite", limit=5, tg_id=tg_id, lang=lang)]

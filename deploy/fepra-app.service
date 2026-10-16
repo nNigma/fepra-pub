@@ -10,6 +10,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/fepra
 Environment=PYTHONPATH=src
+# FEPRA_PUBLIC_URL, VAPID keys etc. are read from the process environment:
+EnvironmentFile=-/opt/fepra/.env
 Environment=TJAPP_PORT=8010
 ExecStart=/opt/fepra/.venv/bin/python -m tjapp.server
 Restart=always

@@ -56,3 +56,19 @@ def render(counts, nick_by_id, period_label: str, lang: str = "ru") -> str:
         blocks.append(i18n.t("stat.user_total", lang, total=total))
         blocks.append("")
     return "\n".join(blocks).rstrip()
+
+
+def aggregate(counts, nick_by_id, lang: str = "ru") -> list[dict]:
+    """Те же данные, что в render, но структурой (для API): пользователи по убыванию
+    активности; actions — {ключ: n}, порядок ключей — ACTION_ORDER, затем прочие."""
+    per_user: dict[int, dict[str, int]] = defaultdict(dict)
+    for row in counts:
+        per_user[int(row["tg_id"])][row["action"]] = int(row["n"])
+    out = []
+    for tg_id, actions in sorted(per_user.items(), key=lambda kv: (-sum(kv[1].values()), kv[0])):
+        keys = [a for a in ACTION_ORDER if actions.get(a)] + \
+               [a for a in actions if a not in ACTION_ORDER and actions.get(a)]
+        out.append({"id": tg_id, "nick": nick_by_id.get(tg_id),
+                    "total": sum(actions.values()),
+                    "actions": [{"key": a, "label": _label(a, lang), "n": actions[a]} for a in keys]})
+    return out

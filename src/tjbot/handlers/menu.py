@@ -29,6 +29,7 @@ BTN_CLUB_SECTION = "Программа зала"
 BTN_COMP_SECTION = "Соревнования"
 BTN_ADD_RESULT = "Добавить результат"
 BTN_ADD_WORKOUT = "Добавить тренировку"
+BTN_ENTER_PM = "✍️ Ввести ПМ"
 BTN_COMP_SUMMARY = "Старты"
 BTN_LEADERBOARD = "🏆 Лидерборд"
 BTN_LANG_RU = "🇷🇺 Русский"
@@ -51,10 +52,11 @@ _MENU_KEYS = [
     "btn.analytics", "btn.record", "btn.back", "btn.lang",
     "btn.club_section", "btn.comp_section", "btn.nutrition", "btn.profile",
     "btn.admin", "btn.edit", "btn.comp", "btn.add_result", "btn.add_workout",
-    "btn.comp_summary", "btn.leaderboard", "btn.result", "btn.comp_fill",
+    "btn.comp_summary", "btn.leaderboard", "btn.enter_pm", "btn.comp_fill",
     "btn.svodka", "btn.trenirovki", "btn.tseli", "btn.goal_single", "btn.feel",
     "btn.coach",
     "btn.club_date", "btn.club_add", "btn.club_edit", "btn.club_stats",
+    "btn.club_athletes",
     "btn.admin_add_user", "btn.admin_del_user", "btn.pro", "btn.admin_stats",
     "btn.meal_record", "btn.meal_water", "btn.meal_edit",   # под-меню «Питание»
     "btn.meal_view", "btn.meal_report",
@@ -99,28 +101,15 @@ def wizard_fallbacks(*extra, cancel=None):
     ]
 
 
-def analytics_kb(lang: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        [[i18n.t("btn.svodka", lang), i18n.t("btn.trenirovki", lang)],
-         [i18n.t("btn.comp_summary", lang), i18n.t("btn.tseli", lang)],
-         [i18n.t("btn.leaderboard", lang)], [i18n.t("btn.back", lang)]],
-        resize_keyboard=True)
-
-
 @restricted
 async def open_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from .. import db as botdb
-    uid = update.effective_user.id if update.effective_user else 0
-    con = botdb.connect(context.bot_data["db_path"])
-    lang = botdb.user_lang(con, uid)
-    con.close()
-    await update.effective_message.reply_text(
-        i18n.t("menu.analytics_intro", lang), reply_markup=analytics_kb(lang))
+    await _open_app(update, context, "summary", "app.open_analytics_btn", "menu.analytics_intro")
 
 
 def record_kb(lang: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        [[i18n.t("btn.add_result", lang)], [i18n.t("btn.add_workout", lang)],
+        [[i18n.t("btn.enter_pm", lang)],
+         [i18n.t("btn.add_result", lang)], [i18n.t("btn.add_workout", lang)],
          [i18n.t("btn.edit", lang)], [i18n.t("btn.back", lang)]],
         resize_keyboard=True)
 
@@ -138,9 +127,9 @@ async def open_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 def main_kb(tg_id: int, lang: str) -> ReplyKeyboardMarkup:
     rows = [[i18n.t("btn.analytics", lang), i18n.t("btn.record", lang)],
-            [i18n.t("btn.club_section", lang), i18n.t("btn.comp_section", lang)],
-            [i18n.t("btn.goal_single", lang), i18n.t("btn.feel", lang)],
-            [i18n.t("btn.nutrition", lang), i18n.t("btn.coach", lang)],
+            [i18n.t("btn.nutrition", lang), i18n.t("btn.club_section", lang)],
+            [i18n.t("btn.coach", lang), i18n.t("btn.goal_single", lang)],
+            [i18n.t("btn.comp_section", lang), i18n.t("btn.feel", lang)],
             [i18n.t("btn.profile", lang), i18n.t("btn.lang", lang)]]
     if is_admin(tg_id):
         rows.append([i18n.t("btn.admin", lang)])
@@ -242,19 +231,28 @@ async def _profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     apple_connected = bool(ap and ap["status"] == "connected")
     await update.effective_message.reply_text(
         text, reply_markup=_profile_kb(lang, bool(acc), astro, goal, city, sam_connected,
-                                        whoop_connected, apple_connected))
+                                        whoop_connected, apple_connected,
+                                        acc_expired=bool(acc and acc["status"] == "expired")))
 
 
 def _profile_kb(lang: str, has_acc: bool, astro: bool, goal: str = "maintain",
                 city: str = "Москва", sam_connected: bool = False,
-                whoop_connected: bool = False, apple_connected: bool = False) -> InlineKeyboardMarkup:
+                whoop_connected: bool = False, apple_connected: bool = False,
+                acc_expired: bool = False) -> InlineKeyboardMarkup:
     rows = []
     if has_acc:
+        # Токены протухли — синк молчит, пока владелец не залогинится заново.
+        # Кнопку подключения даём прямо здесь: отключать аккаунт заранее не надо,
+        # garminconnect сам выбросит мёртвый tokenstore при логине по паролю.
+        if acc_expired:
+            rows += [[InlineKeyboardButton(i18n.t("profile.btn_connect", lang),
+                                           callback_data="gconnect")]]
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_sync", lang), callback_data="gsync")],
                  [InlineKeyboardButton(i18n.t("profile.btn_history", lang), callback_data="ghist")],
                  [InlineKeyboardButton(i18n.t("profile.btn_disconnect", lang), callback_data="gdisc")]]
     elif not sam_connected and not whoop_connected and not apple_connected:
         rows += [[InlineKeyboardButton(i18n.t("profile.btn_connect", lang), callback_data="gconnect")]]
+    rows.append([InlineKeyboardButton(i18n.t("profile.btn_edit", lang), callback_data="pedit:open")])
     rows.append([InlineKeyboardButton(i18n.t("profile.btn_bodyweight", lang), callback_data="bw:start")])
     rows.append([InlineKeyboardButton(
         i18n.t("profile.btn_goal", lang, goal=i18n.t(f"goal.{goal}", lang)),

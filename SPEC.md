@@ -47,10 +47,15 @@
 tj/     ядро: анализ, онтология, нормативы, LLM-клиент, i18n, каноническая схема
 tjbot/  Telegram-бот — слой ВВОДА (запись/правка тренировки, программа зала,
         соревнования, цели, самочувствие, профиль, admin, garmin) + training.db
-tjapp/  FastAPI Mini App — слой ОТЧЁТОВ (REST + статика; валидация Telegram initData)
+tjapp/  FastAPI — Mini App (валидация Telegram initData) + REST для PWA (`routes/*`,
+        сессии после входа по инвайту и passkey) + раздача сборки PWA под `/app/`
+web/    PWA (beta): Vite + TypeScript + React
 ```
 
-Бот пишет в `training.db`, Mini App читает из неё через `tj.analysis.*`. «Разбор от
+Доменная логика — в `tj/services/*` (чистые функции над sqlite-соединением, без HTTP);
+её зовут и хендлеры бота, и REST-роуты. Схема меняется только добавлением, чтобы бот и
+PWA жили на одной БД, пока бот не выключен. Долгие операции (распознавание фото,
+разборы ИИ) — задачи `jobs` с поллингом статуса. «Разбор от
 Месье Клода» пишет отдельный скилл `fepra-claude-review` (вне репо).
 
 ## 5. Каноническая схема
@@ -112,7 +117,9 @@ Vendor-agnostic сущности (`tj/models.py`), таблицы — в `tjbot/
 
 Данные `training.db` мультиюзерные (ключ `tg_id`, владелец `OWNER_ID`). Приватность —
 **режим тренера:** админ видит всех view-only («смотреть как»), обычные юзеры — только
-себя. Доступ по allowlist; роли admin/Pro в JSON-файлах (gitignored).
+себя. Доступ по allowlist / инвайтам; роли admin / тренер зала / Pro — в БД
+(`user_roles`, старые JSON-файлы импортируются миграцией). Залы — таблица `gyms`, у
+каждого своя программа дня и лидерборд.
 
 ## 11. Garmin
 
@@ -134,11 +141,15 @@ Vendor-agnostic сущности (`tj/models.py`), таблицы — в `tjbot/
 
 ## 13. Деплой
 
-Прод — сервер вне РФ (**Gemini API не ходит с росс. IP**). systemd-юниты
-`fepra-bot` + `fepra-app`, реверс-прокси **Caddy** (Let's Encrypt) на
-твоём домене (например `<your>.duckdns.org`), Mini App на `:8010`. Деплой = `rsync src/` + рестарт сервисов;
-данные сервера (`training.db`, `.env`, токены) не перезаписываются; миграции схемы —
-идемпотентно в `init_schema`. Бэкап БД — pull-only снимок с сервера.
+Прод — любой небольшой Linux-хост, с которого доступен **Gemini API** (из РФ не
+работает). systemd-юниты `fepra-bot` + `fepra-app` (uvicorn на `:8010`: Mini App, REST,
+PWA под `/app/`). Публичный HTTPS-адрес — `FEPRA_PUBLIC_URL`: свой домен за **Caddy**
+(Let's Encrypt) или туннель (Tailscale Funnel / Cloudflare Tunnel); адрес постоянный,
+т.к. на нём держатся passkey. Деплой = обновить код, собрать PWA (`web/` →
+`src/tjapp/static/app/`), рестарт сервисов; данные сервера (`training.db`, `.env`,
+токены) не перезаписываются; миграции схемы — идемпотентно (`init_schema` +
+`tj/migrations`). Кроны: синк часов → авторазборы, Web Push раз в час. Бэкап БД —
+pull-only снимок с сервера.
 
 ## 14. Legacy: Obsidian/CLI-слой
 

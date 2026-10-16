@@ -1,7 +1,7 @@
 """Разовый бэкфилл quality у приёмов без оценки: Claude оценивает по названиям
 блюд (фото уже нет), батчами, с фолбэком на Gemini.
 Запуск: PYTHONPATH=src python -m tjbot.backfill_meal_quality [--apply]
-На сервере claude не в PATH у SSH-шелла: CLAUDE_BIN=/root/.local/bin/claude PYTHONPATH=src ...
+На сервере claude не в PATH у SSH-шелла: CLAUDE_BIN=$HOME/.local/bin/claude PYTHONPATH=src ...
 По умолчанию dry-run: печатает план, ничего не пишет."""
 from __future__ import annotations
 

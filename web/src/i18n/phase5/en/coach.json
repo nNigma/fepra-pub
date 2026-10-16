@@ -1,0 +1,12 @@
+{
+ "coach.ask": "Ask",
+ "coach.left": "Questions left today: {n} of {total}",
+ "coach.limit_reached": "Today's question limit is reached. Try again tomorrow.",
+ "coach.no_recent": "No questions yet.",
+ "coach.q": "Your question",
+ "coach.q_ph": "E.g. how to structure the week before a competition?",
+ "coach.recent": "Recent questions",
+ "coach.thinking": "The coach is thinking…",
+ "coach.title": "AI coach",
+ "coach.unlimited": "No limit for admins"
+}

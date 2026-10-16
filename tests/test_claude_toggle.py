@@ -118,11 +118,15 @@ def test_engine_for_on_is_claude(monkeypatch):
     assert vision.engine_for(123) == "claude"
 
 
-def test_review_ask_uses_deep_complete(monkeypatch):
+def test_review_ask_uses_gemini_when_claude_off(monkeypatch):
     from tjbot import claude_review
     monkeypatch.setenv("FEPRA_USE_CLAUDE", "0")
-    monkeypatch.setattr(llm, "deep_complete", lambda p, **k: '{"blocks": []}')
-    assert claude_review._ask("инструкция") == {"blocks": []}
+    monkeypatch.delenv("FEPRA_LLM_ENGINE", raising=False)
+    monkeypatch.setattr(llm, "has_llm", lambda: True)
+    monkeypatch.setattr(llm, "claude_complete",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("claude off")))
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: '{"blocks": []}')
+    assert claude_review._ask("инструкция") == ({"blocks": []}, "gemini")
 
 
 def test_run_all_no_hardstop_without_claude(monkeypatch):

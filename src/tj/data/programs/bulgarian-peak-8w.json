@@ -1,0 +1,3238 @@
+{
+ "schema": 1,
+ "slug": "bulgarian-peak-8w",
+ "version": 1,
+ "title": {
+  "ru": "Болгарская система: 8 недель до теста максимума",
+  "en": "Bulgarian system: 8 weeks to a max test"
+ },
+ "summary": {
+  "ru": "8 недель: 1 объёмная, 5 средних, 2 высокие. Синглы 50→95% и «максимум дня», присед каждую неделю, тяги не нужны. Вес стоит, растёт число синглов, потом +5 пунктов. В конце тест максимума: лесенка до 95% и попытки на 100%.",
+  "en": "8 weeks: 1 volume, 5 medium, 2 high. Singles 50 to 95% and a day max, squats every week, no pulls. The load stays, singles grow, then +5 points. Ends with a max test: ladder to 95% and attempts at 100%."
+ },
+ "params": {
+  "weeks": 8,
+  "session_minutes": [
+   30,
+   60
+  ],
+  "days_per_week": [
+   4,
+   5
+  ],
+  "week_types": {
+   "volume": 1,
+   "medium": 5,
+   "high": 2
+  }
+ },
+ "required_lifts": [
+  "squat_snatch",
+  "clean_and_jerk",
+  "back_squat"
+ ],
+ "optional_lifts": [
+  "front_squat"
+ ],
+ "rules": {
+  "on_miss": "drop_5kg_continue",
+  "deload_pct": 70,
+  "illness_drop_pct": 10,
+  "test_freshness_days": 60
+ },
+ "weeks": [
+  {
+   "week": 1,
+   "type": "volume",
+   "title": {
+    "ru": "Неделя 1: объёмная",
+    "en": "Week 1: volume"
+   },
+   "note": {
+    "ru": "Объёмная неделя: четыре коротких дня. Синглы до 70%, четыре штуки на верхнем весе.",
+    "en": "Volume week: four short days. Singles up to 70%, four of them at the top."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок + присед",
+      "en": "Snatch + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            70,
+            70,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 70,
+           "sets": 4,
+           "reps": 5,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Рывок и присед. Рывок учит скорости и точности под штангой, присед строит силу ног для вставания из седа. Это основа недели.",
+      "en": "Snatch and squat. The snatch trains speed and accuracy under the bar, the squat builds leg strength for standing out of the catch. The base of the week."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            70,
+            70,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 65,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 3,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            65,
+            65,
+            65
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            60,
+            60,
+            60
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 65,
+           "sets": 3,
+           "reps": 5,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (средний)",
+      "en": "C&J (medium)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            65,
+            65,
+            65
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            60,
+            60,
+            60
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день взятия и толчка: вес ниже, чем в тяжёлый день. Закрепляем технику взятия и толчка без лишней усталости.",
+      "en": "Medium clean & jerk day: lower weight than the heavy day. We lock in C&J technique without extra fatigue."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "medium"
+    }
+   ]
+  },
+  {
+   "week": 2,
+   "type": "medium",
+   "title": {
+    "ru": "Неделя 2: средняя",
+    "en": "Week 2: medium"
+   },
+   "note": {
+    "ru": "Пошли средние недели: пять коротких дней, присед каждую неделю. Вес стоит, растёт число синглов.",
+    "en": "Medium weeks start: five short days, squats every week. The load stays, singles grow."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 75,
+           "sets": 4,
+           "reps": 4,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 70,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 70,
+           "sets": 3,
+           "reps": 4,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 3,
+   "type": "medium",
+   "title": {
+    "ru": "Неделя 3: средняя",
+    "en": "Week 3: medium"
+   },
+   "note": {
+    "ru": "",
+    "en": ""
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 77.5,
+           "sets": 4,
+           "reps": 4,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 72.5,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 72.5,
+           "sets": 3,
+           "reps": 4,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 4,
+   "type": "medium",
+   "title": {
+    "ru": "Неделя 4: средняя",
+    "en": "Week 4: medium"
+   },
+   "note": {
+    "ru": "Верхний вес +5 пунктов, число синглов снова с двух.",
+    "en": "Top percent +5 points, singles restart from two."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 80,
+           "sets": 4,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 75,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 75,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 5,
+   "type": "medium",
+   "title": {
+    "ru": "Неделя 5: средняя",
+    "en": "Week 5: medium"
+   },
+   "note": {
+    "ru": "",
+    "en": ""
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 80,
+           "sets": 4,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 75,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            75,
+            75
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            90,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 75,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 6,
+   "type": "medium",
+   "title": {
+    "ru": "Неделя 6: средняя",
+    "en": "Week 6: medium"
+   },
+   "note": {
+    "ru": "Последняя средняя неделя. Дальше две высокие.",
+    "en": "Last medium week. Two high weeks follow."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 82.5,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 77.5,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 77.5,
+           "sets": 2,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 7,
+   "type": "high",
+   "title": {
+    "ru": "Неделя 7: высокая",
+    "en": "Week 7: high"
+   },
+   "note": {
+    "ru": "Высокая неделя: «максимум дня» на 90% в двух днях. При усталости — чек-ин, вес снизится сам.",
+    "en": "High week: a day max at 90% on two days. If tired, use the check-in."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 35,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120,
+            120
+           ]
+          },
+          {
+           "day_max": {
+            "pct": 90,
+            "tries": 3
+           },
+           "rest_sec": 180
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 85,
+           "sets": 3,
+           "reps": 2,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок + фронтальный",
+      "en": "C&J + front squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "front",
+         "lift": "front_squat",
+         "name": {
+          "ru": "Фронтальный присед",
+          "en": "Front squat"
+         },
+         "steps": [
+          {
+           "pct": 80,
+           "sets": 3,
+           "reps": 3,
+           "rest_sec": 120
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Взятие и толчок плюс фронтальный присед. Фронтальный укрепляет стойку на груди и ноги, которые нужны, чтобы встать из взятия. Само взятие и толчок отрабатывается в той же логике лесенки и синглов.",
+      "en": "Clean & jerk plus front squat. The front squat strengthens the rack position and the legs you need to stand out of the clean. The C&J itself follows the same ladder-and-singles logic."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок",
+       "фронтальный присед"
+      ],
+      "en": [
+       "clean & jerk",
+       "front squat"
+      ]
+     },
+     "intensity": "base"
+    },
+    {
+     "idx": 3,
+     "dow": 2,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Техника: рывок и толчок",
+      "en": "Technique: snatch and C&J"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Технический день: лёгкие веса, внимание на траектории штанги, скорости под штангу и позиции. Это инвестиция в тяжёлые дни: без чистой техники тяжёлый вес не взять.",
+      "en": "A technical day: light weights, attention on bar path, speed under the bar and positions. An investment in the heavy days: no heavy weight without clean technique."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "толчок",
+       "техника"
+      ],
+      "en": [
+       "snatch",
+       "jerk",
+       "technique"
+      ]
+     },
+     "intensity": "technique"
+    },
+    {
+     "idx": 4,
+     "dow": 4,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (средний) + присед",
+      "en": "Snatch (medium) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            80
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 80,
+           "sets": 2,
+           "reps": 2,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Средний день рывка: вес ниже, чем в тяжёлый день. Копим технические повторения без сильной усталости и даём телу восстановиться между тяжёлыми днями. Присед держит силу ног.",
+      "en": "Medium snatch day: lower weight than the heavy day. We bank technical reps without much fatigue and let the body recover between heavy days. The squat keeps leg strength."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "medium"
+    },
+    {
+     "idx": 5,
+     "dow": 5,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120,
+            120
+           ]
+          },
+          {
+           "day_max": {
+            "pct": 90,
+            "tries": 3
+           },
+           "rest_sec": 180
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    }
+   ]
+  },
+  {
+   "week": 8,
+   "type": "high",
+   "title": {
+    "ru": "Неделя 8: высокая",
+    "en": "Week 8: high"
+   },
+   "note": {
+    "ru": "Две тяжёлые сессии, лёгкий день и тест максимума в субботу: лесенка до 95%, затем попытки, лучший день — попытка на 100%.",
+    "en": "Two heavy sessions, a light day, and the max test on Saturday: ladder to 95%, then attempts, best day goes for 100%."
+   },
+   "sessions": [
+    {
+     "idx": 1,
+     "dow": 0,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Рывок (тяжёлый) + присед",
+      "en": "Snatch (heavy) + squat"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          },
+          {
+           "day_max": {
+            "pct": 90,
+            "tries": 2
+           },
+           "rest_sec": 180
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 80,
+           "sets": 3,
+           "reps": 2,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день рывка: самая высокая нагрузка недели для рывка и присед для силы ног. Здесь растёт ваш рабочий рывок и учится держать скорость на тяжёлом весе.",
+      "en": "Heavy snatch day: the highest snatch load of the week plus a squat for leg strength. This is where your working snatch grows and learns to stay fast at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "присед"
+      ],
+      "en": [
+       "snatch",
+       "squat"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 2,
+     "dow": 1,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Взятие и толчок (тяжёлый)",
+      "en": "C&J (heavy)"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            85
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            120,
+            120
+           ]
+          },
+          {
+           "day_max": {
+            "pct": 90,
+            "tries": 2
+           },
+           "rest_sec": 180
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Тяжёлый день взятия и толчка: самая высокая нагрузка недели для взятия и толчка. Работаем над тем, чтобы подъём и толчок получались быстро и собранно на тяжёлом весе.",
+      "en": "Heavy clean & jerk day: the highest C&J load of the week. We work on a fast, compact clean and jerk at heavy weights."
+     },
+     "focus": {
+      "ru": [
+       "взятие и толчок"
+      ],
+      "en": [
+       "clean & jerk"
+      ]
+     },
+     "intensity": "heavy"
+    },
+    {
+     "idx": 3,
+     "dow": 3,
+     "kind": "normal",
+     "minutes": 30,
+     "title": {
+      "ru": "Свежесть: лёгкая лесенка",
+      "en": "Freshness: light ladder"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90
+           ]
+          }
+         ]
+        },
+        {
+         "id": "squat",
+         "lift": "back_squat",
+         "name": {
+          "ru": "Присед на спине",
+          "en": "Back squat"
+         },
+         "steps": [
+          {
+           "pct": 65,
+           "sets": 2,
+           "reps": 3,
+           "rest_sec": 150
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Лёгкий день перед тестом. Короткая лесенка без тяжёлых синглов: тело отдыхает, а движение остаётся «на руках».",
+      "en": "A light day before the test. A short ladder without heavy singles: the body rests while the movement stays fresh."
+     },
+     "focus": {
+      "ru": [
+       "свежесть",
+       "техника"
+      ],
+      "en": [
+       "freshness",
+       "technique"
+      ]
+     },
+     "intensity": "light"
+    },
+    {
+     "idx": 4,
+     "dow": 5,
+     "kind": "test",
+     "minutes": 60,
+     "title": {
+      "ru": "Тест максимума",
+      "en": "Max test"
+     },
+     "blocks": [
+      {
+       "title": {
+        "ru": "Основная часть",
+        "en": "Main work"
+       },
+       "exercises": [
+        {
+         "id": "snatch",
+         "lift": "squat_snatch",
+         "name": {
+          "ru": "Рывок в сед",
+          "en": "Squat snatch"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            90,
+            95
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            150,
+            150,
+            180
+           ]
+          },
+          {
+           "attempts": [
+            100,
+            103,
+            106
+           ],
+           "rest_sec": 240
+          }
+         ]
+        },
+        {
+         "id": "cj",
+         "lift": "clean_and_jerk",
+         "name": {
+          "ru": "Взятие и толчок",
+          "en": "Clean & jerk"
+         },
+         "steps": [
+          {
+           "ladder": [
+            50,
+            60,
+            70,
+            80,
+            85,
+            90,
+            95
+           ],
+           "reps": 1,
+           "rest_sec": [
+            60,
+            60,
+            90,
+            120,
+            150,
+            150,
+            180
+           ]
+          },
+          {
+           "attempts": [
+            100,
+            103,
+            106
+           ],
+           "rest_sec": 240
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "purpose": {
+      "ru": "Узнаём ваш реальный максимум. Лесенка до 95% подводит нервную систему, затем три попытки на 100% и выше.",
+      "en": "Find your real max. The ladder to 95% primes the nervous system, then three attempts at 100% and above."
+     },
+     "focus": {
+      "ru": [
+       "рывок",
+       "взятие и толчок"
+      ],
+      "en": [
+       "snatch",
+       "clean & jerk"
+      ]
+     },
+     "intensity": "max"
+    }
+   ]
+  }
+ ],
+ "about": [
+  {
+   "id": "intro",
+   "title": {
+    "ru": "Об этой программе",
+    "en": "About this programme"
+   },
+   "text": {
+    "ru": "Восьминедельный цикл, который ведёт к тесту максимума. Сразу четыре-пять дней в неделю, одна объёмная неделя, пять средних и две высокие. В последнюю субботу тест: лесенка до 95% и попытки на 100% и выше. Подходит, если базовая частота уже привычна, например после адаптации.",
+    "en": "An eight-week cycle leading to a max test. Four to five days a week from the start: one volume week, five medium and two high. The last Saturday is the test: a ladder to 95% and attempts at 100% and above. Fits if the base frequency is already familiar, for example after the adaptation programme."
+   }
+  },
+  {
+   "id": "what",
+   "title": {
+    "ru": "Что такое болгарская система",
+    "en": "What the Bulgarian system is"
+   },
+   "text": {
+    "ru": "Школа тяжёлой атлетики, которую в 1970–80-х сделала знаменитой сборная Болгарии (тренер Иван Абаджиев). Идея простая: поднимать тяжело и часто, но немного. Почти все тренировки состоят из рывка, взятия и толчка и приседаний, а вес держится близко к максимуму. Растёт не объём и не разнообразие, а качество движения под тяжёлой штангой и привычка нервной системы к большим весам. Здесь это адаптированная версия для любителя: короткие сессии по 30–60 минут и 3–5 дней в неделю вместо двух-трёх тренировок в день у сборников.",
+    "en": "A weightlifting school made famous by the Bulgarian national team in the 1970s–80s (coach Ivan Abadjiev). The idea is simple: lift heavy and often, but not much. Almost every session is snatch, clean & jerk and squats, with the weight kept close to your max. What grows is not volume or variety but the quality of the lift under heavy load and your nervous system's habit of big weights. This is an adapted version for amateurs: short 30–60 minute sessions and 3–5 days a week instead of the national team's two or three sessions a day."
+   }
+  },
+  {
+   "id": "singles",
+   "title": {
+    "ru": "Синглы и лесенка",
+    "en": "Singles and the ladder"
+   },
+   "text": {
+    "ru": "Основная работа идёт одиночными повторами (синглами). Каждый сет начинается с лесенки: 50%, 60%, 70% и так до рабочего веса, чтобы разогреть тело и поймать движение. Потом идут рабочие синглы на одном и том же весе. Каждый сингл должен быть чистым: если техника поплыла, смысла в подъёме нет. Отдых между подходами задан в плане, таймер запустится сам.",
+    "en": "The main work is single repetitions. Every lift starts with a ladder: 50%, 60%, 70% and so on up to the working weight, to warm up and find the movement. Then come the working singles at the same weight. Every single must be clean: if technique breaks down, the rep is not worth it. Rest between sets is set in the plan and the timer starts by itself."
+   }
+  },
+  {
+   "id": "progress",
+   "title": {
+    "ru": "Как растёт нагрузка",
+    "en": "How the load progresses"
+   },
+   "text": {
+    "ru": "Вес стоит, растёт число синглов. Опорный вес держится несколько недель, а на нём становится 2, потом 3, потом 4 сингла. Когда число синглов выбрано, опорный вес поднимается на 5 пунктов, а синглов снова два. Так нервная система привыкает к весу постепенно, без скачков. Все веса считаются от ваших максимумов, поэтому план подстраивается под вас.",
+    "en": "The weight stays, the number of singles grows. The reference weight holds for several weeks and you do 2 singles at it, then 3, then 4. When the singles are used up, the reference weight goes up by 5 points and you start again from two. This way the nervous system gets used to the weight gradually, without jumps. All weights are computed from your maxes, so the plan fits you."
+   }
+  },
+  {
+   "id": "daymax",
+   "title": {
+    "ru": "«Максимум дня»",
+    "en": "The day max"
+   },
+   "text": {
+    "ru": "В тяжёлые недели после лесенки идёт «максимум дня»: вы доходите до самого тяжёлого сингла, который сегодня получается чисто, в пределах процента, указанного в плане. Так вес в каждый день соответствует состоянию тела, а не бумаге. Хороший день даёт рекордный сингл, плохой день не ломает неделю.",
+    "en": "In heavy weeks the ladder is followed by a day max: you work up to the heaviest single that moves cleanly today, within the percentage the plan allows. That way each day's weight matches how your body is, not what the paper says. A good day gives a heavy single, a bad day does not wreck the week."
+   }
+  },
+  {
+   "id": "squat",
+   "title": {
+    "ru": "Почему приседания каждую неделю",
+    "en": "Why squats every week"
+   },
+   "text": {
+    "ru": "Приседания на спине и фронтальные строят силу ног, а она решает, сможете ли вы встать из глубокого седа с тяжёлой штангой. В этой версии отдельных тяг нет: приседания и сами подъёмные движения закрывают всё необходимое.",
+    "en": "Back and front squats build leg strength, which decides whether you can stand up from a deep catch with a heavy bar. This version has no separate pulls: squats and the lifts themselves cover what is needed."
+   }
+  },
+  {
+   "id": "safety",
+   "title": {
+    "ru": "Если что-то пошло не так",
+    "en": "If something goes wrong"
+   },
+   "text": {
+    "ru": "Не получилось поднять вес: отметьте промах, и план опустит вес на 5 кг и пойдёт дальше без драмы. Болеете или сильно устали: сделайте чек-ин перед тренировкой, веса снизятся сами (при болезни на 10%). Разгрузочные недели на 70%, если они есть в программе, это не лень, а часть системы: без восстановления роста не будет.",
+    "en": "Missed a lift: mark the miss and the plan drops the weight by 5 kg and moves on without drama. Ill or very tired: do the check-in before the session and weights drop automatically (by 10% when ill). Deload weeks at 70%, where the programme has them, are not laziness but part of the system: there is no growth without recovery."
+   }
+  }
+ ],
+ "week_types": {
+  "volume": {
+   "title": {
+    "ru": "Объёмная неделя",
+    "en": "Volume week"
+   },
+   "text": {
+    "ru": "Самая лёгкая по весам и самая насыщенная по числу подходов. Синглы до 70%, по четыре штуки на верхнем весе. Цель: наработать технику и привыкнуть к частоте. Без отказа и без героизма.",
+    "en": "The lightest in weight and the busiest in number of sets. Singles up to 70%, four at the top weight. Goal: build technique and get used to the frequency. No grinding, no heroics."
+   }
+  },
+  "medium": {
+   "title": {
+    "ru": "Средняя неделя",
+    "en": "Medium week"
+   },
+   "text": {
+    "ru": "Рабочая неделя этапа. Вес стоит, число синглов растёт. Тяжёлые дни чередуются со средними и техническими, чтобы телу было когда восстановиться.",
+    "en": "The working week of a stage. The weight holds, the number of singles grows. Heavy days alternate with medium and technical ones so the body has time to recover."
+   }
+  },
+  "high": {
+   "title": {
+    "ru": "Высокая неделя",
+    "en": "High week"
+   },
+   "text": {
+    "ru": "Самая тяжёлая неделя этапа. После лесенки идёт «максимум дня» на 80–90%. Здесь растут рабочие максимумы. Если накопилась усталость, сделайте чек-ин, вес снизится сам.",
+    "en": "The heaviest week of a stage. The ladder is followed by a day max at 80–90%. This is where working maxes grow. If fatigue has built up, do the check-in and the weight drops by itself."
+   }
+  },
+  "test": {
+   "title": {
+    "ru": "Тест максимума",
+    "en": "Max test"
+   },
+   "text": {
+    "ru": "Лесенка до 95% и затем попытки на 100% и выше. Результат становится вашим новым опорным максимумом для следующих программ.",
+    "en": "A ladder up to 95% and then attempts at 100% and above. The result becomes your new reference max for later programs."
+   }
+  }
+ }
+}

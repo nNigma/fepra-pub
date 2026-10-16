@@ -15,6 +15,7 @@ from ..store.build import _connect
 from .advice import next_session_advice
 from .engine import analyze, daily_loads
 from .muscles import week_muscles
+from . import nutrition
 from .narrative import period_blocks, to_json
 from .report import _read_full
 from .state import baseline, classify, decompose_readiness, microcycle, risk_flag
@@ -120,6 +121,32 @@ def _ts_human(phrase, lang="ru"):
     return str(phrase).replace("_", " ").title()
 
 
+def _nutrition_contrib(db_path, backend, tg_id, readiness_day):
+    """Вклад питания в готовность за день до замера.
+
+    Утренняя готовность отражает еду накануне, поэтому берём readiness_day - 1.
+    Любой сбой (нет профиля, нет норм, чужой бэкенд) — None: строка просто не
+    появится, как и у HRV со сном без данных.
+    """
+    if backend != "sqlite" or not readiness_day:
+        return None
+    try:
+        from tjbot import db as botdb
+        from tjbot import llm_gen
+
+        day = (datetime.date.fromisoformat(readiness_day)
+               - datetime.timedelta(days=1)).isoformat()
+        con = botdb.connect(str(db_path))
+        try:
+            meals = botdb.meals_for_day(con, tg_id, day)
+            _, _, targets = llm_gen.user_targets(con, tg_id, day)
+        finally:
+            con.close()
+        return nutrition.readiness_contrib(meals, targets)
+    except Exception:
+        return None
+
+
 def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict:
     rep = analyze(db_path, backend, hr_max, sex, tg_id=tg_id)
     daily, acts = _read_full(db_path, backend, tg_id)
@@ -184,6 +211,9 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
     if rhr_cur is not None and rhr_base:
         contribs["Пульс покоя"] = round(rhr_base["mean"] - rhr_cur)
     contribs["Долг нагрузки"] = load_debt
+    nutr = _nutrition_contrib(db_path, backend, tg_id, cur[0] if cur else None)
+    if nutr is not None:
+        contribs["Питание"] = nutr
 
     rdy_decomp = decompose_readiness(
         rdy_cur,
@@ -272,7 +302,7 @@ def summary_data(db_path, backend, hr_max, sex, today, tg_id, lang="ru") -> dict
                       "extra": json.loads(a[12]) if a[12] else {}}
                      for a in acts if a[0] and week_cut <= a[0] <= today.isoformat()]
 
-    today_str = rep["range"][1]
+    today_str = rep["range"][1] or today.isoformat()
     mc_days_input = []
     for row in full_rows[-7:]:
         mc_days_input.append((row[0], round(li.get(row[0], 0)), row[1]))

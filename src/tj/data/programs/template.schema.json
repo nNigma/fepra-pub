@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FePra program template",
+  "description": "Шаблон программы (версионируемый). Полная проверка — tj.services.program_engine.validate_template (в том числе смысловая: лифты из онтологии, дни недели, уникальные id).",
+  "type": "object",
+  "required": ["schema", "slug", "version", "title", "summary", "params", "required_lifts", "rules", "weeks"],
+  "properties": {
+    "schema": {"const": 1},
+    "slug": {"type": "string"},
+    "version": {"type": "integer", "minimum": 1},
+    "title": {"$ref": "#/$defs/bi"},
+    "summary": {"$ref": "#/$defs/bi"},
+    "params": {"type": "object"},
+    "required_lifts": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "optional_lifts": {"type": "array", "items": {"type": "string"}},
+    "rules": {
+      "type": "object",
+      "required": ["on_miss"],
+      "properties": {
+        "on_miss": {"enum": ["drop_5kg_continue"]},
+        "deload_pct": {"type": "number", "minimum": 40, "maximum": 90},
+        "illness_drop_pct": {"type": "number", "minimum": 0, "maximum": 30},
+        "test_freshness_days": {"type": "integer"}
+      }
+    },
+    "about": {"type": "array", "description": "Описание программы: блоки {id, title, text} (ru/en)", "items": {"type": "object", "required": ["id", "title", "text"], "properties": {"id": {"type": "string"}, "title": {"$ref": "#/$defs/bi"}, "text": {"$ref": "#/$defs/bi"}}}},
+    "week_types": {"type": "object", "description": "Что значит тип недели: {volume|medium|high|deload|test: {title, text}}"},
+    "weeks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/week"}}
+  },
+  "$defs": {
+    "bi": {"type": "object", "required": ["ru", "en"], "properties": {"ru": {"type": "string"}, "en": {"type": "string"}}},
+    "week": {
+      "type": "object",
+      "required": ["week", "type", "title", "sessions"],
+      "properties": {
+        "week": {"type": "integer", "minimum": 1},
+        "type": {"enum": ["volume", "medium", "high", "deload", "test"]},
+        "title": {"$ref": "#/$defs/bi"},
+        "note": {"$ref": "#/$defs/bi"},
+        "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session"}}
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": ["idx", "dow", "minutes", "title", "blocks"],
+      "properties": {
+        "idx": {"type": "integer", "minimum": 1},
+        "dow": {"type": "integer", "minimum": 0, "maximum": 6, "description": "0 = понедельник"},
+        "kind": {"enum": ["normal", "test", "deload"]},
+        "minutes": {"type": "integer", "minimum": 10, "maximum": 120},
+        "title": {"$ref": "#/$defs/bi"},
+        "purpose": {"$ref": "#/$defs/bi"},
+        "focus": {"type": "object", "description": "Над чем работаем: {ru: [..], en: [..]}"},
+        "intensity": {"enum": ["max", "heavy", "medium", "light", "technique", "base"]},
+        "blocks": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "required": ["title", "exercises"],
+          "properties": {"title": {"$ref": "#/$defs/bi"},
+                         "exercises": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/exercise"}}}}}
+      }
+    },
+    "exercise": {
+      "type": "object",
+      "required": ["id", "lift", "name", "steps"],
+      "properties": {
+        "id": {"type": "string"},
+        "lift": {"type": "string", "description": "каноническое имя из tj.ontology"},
+        "name": {"$ref": "#/$defs/bi"},
+        "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}}
+      }
+    },
+    "pct": {"type": "number", "minimum": 10, "maximum": 110},
+    "step": {
+      "type": "object",
+      "description": "Ровно один вид шага: ladder | sets | day_max | attempts. rest_sec — отдых после подхода, секунды (число, для ladder можно список по ступеням); нет — берётся по умолчанию от тяжести.",
+      "properties": {"rest_sec": {"oneOf": [{"type": "integer", "minimum": 0, "maximum": 900},
+                                          {"type": "array", "items": {"type": "integer", "minimum": 0, "maximum": 900}}]}},
+      "oneOf": [
+        {"required": ["ladder"], "properties": {
+          "ladder": {"type": "array", "minItems": 1, "items": {"oneOf": [
+            {"$ref": "#/$defs/pct"},
+            {"type": "object", "required": ["pct"], "properties": {"pct": {"$ref": "#/$defs/pct"}, "reps": {"type": "integer"}}}]}},
+          "reps": {"type": "integer", "minimum": 1}}},
+        {"required": ["sets", "reps"], "properties": {
+          "sets": {"type": "integer", "minimum": 1}, "reps": {"type": "integer", "minimum": 1},
+          "pct": {"$ref": "#/$defs/pct"},
+          "load": {"type": "object", "required": ["pct"], "properties": {
+            "lift": {"type": "string"}, "pct": {"$ref": "#/$defs/pct"}, "rounding": {"enum": [1, 2.5, 5]}}}}},
+        {"required": ["day_max"], "properties": {"day_max": {"type": "object", "required": ["pct", "tries"],
+          "properties": {"pct": {"$ref": "#/$defs/pct"}, "tries": {"type": "integer", "minimum": 1, "maximum": 6}}}}},
+        {"required": ["attempts"], "properties": {"attempts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pct"}}}}
+      ]
+    }
+  }
+}

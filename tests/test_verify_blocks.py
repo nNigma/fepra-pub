@@ -88,6 +88,61 @@ def test_verify_benchmark_blocks_untouched(monkeypatch):
     assert out is src and verified is False and not called
 
 
+def _ladder_json(scheme):
+    return json.dumps([{
+        "header": "WOD№1  12 мин", "format": "ladder", "rounds": None, "reps": None,
+        "work_min": None, "rest_min": None, "has_cap": False, "scheme": scheme,
+        "movements": ["Взятие и толчок"],
+    }], ensure_ascii=False)
+
+
+def _verified_scheme(monkeypatch, scheme):
+    monkeypatch.setattr(llm, "has_claude_vision", lambda: True)
+    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: _ladder_json(scheme))
+    out, verified = vision.verify_result_blocks("доска", _blocks())
+    assert verified is True
+    return out[0]["scheme"]
+
+
+def test_verify_scheme_string_parsed_to_ints(monkeypatch):
+    assert _verified_scheme(monkeypatch, "7-5-3") == [7, 5, 3]
+
+
+def test_verify_scheme_garbage_string_dropped(monkeypatch):
+    got = _verified_scheme(monkeypatch, "7-5-3 Взятие и толчок / 4-3-2 Bar Muscle-Up")
+    assert got is None
+
+
+def test_verify_scheme_percent_string_dropped(monkeypatch):
+    assert _verified_scheme(monkeypatch, "70% до 85%") is None
+
+
+def test_verify_scheme_list_kept(monkeypatch):
+    assert _verified_scheme(monkeypatch, [21, 15, 9]) == [21, 15, 9]
+
+
+def test_verify_scheme_list_of_strings_normalized(monkeypatch):
+    assert _verified_scheme(monkeypatch, ["7", "5"]) == [7, 5]
+
+
+def test_verify_scheme_empty_list_dropped(monkeypatch):
+    assert _verified_scheme(monkeypatch, []) is None
+
+
+def test_verify_scheme_nonfinite_no_crash(monkeypatch):
+    monkeypatch.setattr(llm, "has_claude_vision", lambda: True)
+    monkeypatch.setattr(llm, "claude_complete",
+                        lambda p, **k: _ladder_json([float("nan"), 15, 9]))
+    out, verified = vision.verify_result_blocks("доска", _blocks())
+    assert verified is True
+    assert out[0]["scheme"] is None
+
+
+def test_verify_prompt_asks_for_number_array():
+    assert "scheme (массив чисел или null" in vision._VERIFY_PROMPT
+    assert "scheme (строка" not in vision._VERIFY_PROMPT
+
+
 def test_claude_complete_envelope(monkeypatch):
     monkeypatch.setattr(llm, "_claude_bin", lambda: "claude")
 

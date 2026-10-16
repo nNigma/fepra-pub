@@ -50,16 +50,31 @@ def test_coach_workout_returns_text(monkeypatch):
 
 def test_coach_claude_first(monkeypatch):
     from tj import llm
+    monkeypatch.setattr(llm, "has_agent", lambda: False)
+    monkeypatch.setattr(llm, "has_claude_text", lambda: True)
     monkeypatch.setattr(llm, "claude_complete", lambda p, **k: "от клода")
     text, engine = llm_coach.coach("summary", {"x": 1})
     assert text == "от клода" and engine == "claude"
 
 
-def test_coach_falls_back_to_gemini(monkeypatch):
+def test_coach_agent_first_when_engine_agent(monkeypatch):
+    """FEPRA_LLM_ENGINE=agent -> сначала агент; подпись — agent, не claude."""
     from tj import llm
-    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: None)
-    monkeypatch.setattr(llm, "complete",
-                        lambda s, u, max_output_tokens=800: "от жени")
+    monkeypatch.setenv("FEPRA_LLM_ENGINE", "agent")
+    monkeypatch.setattr(llm, "has_agent", lambda: True)
+    monkeypatch.setattr(llm, "agent_run", lambda p, **k: "от агента")
+    monkeypatch.setattr(llm, "claude_complete", lambda p, **k: "клод не должен был вызваться")
+    text, engine = llm_coach.coach("summary", {"x": 1})
+    assert text == "от агента" and engine == "agent"
+
+
+def test_coach_falls_back_to_gemini(monkeypatch):
+    """Ни агента, ни claude — разбор пишет Gemini, и это видно по подписи."""
+    from tj import llm
+    monkeypatch.setattr(llm, "has_agent", lambda: False)
+    monkeypatch.setattr(llm, "has_claude_vision", lambda: False)
+    monkeypatch.setattr(llm, "has_llm", lambda: True)
+    monkeypatch.setattr(llm, "complete", lambda s, u, **k: "от жени")
     for kind in ("workout", "summary", "competitions"):
         text, engine = llm_coach.coach(kind, {"x": 1})
         assert text == "от жени" and engine == "gemini"

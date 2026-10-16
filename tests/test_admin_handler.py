@@ -44,11 +44,11 @@ def _db_path(tmp_path) -> str:
 
 def test_review_run_blocks_without_any_llm(monkeypatch, tmp_path):
     monkeypatch.setattr(admin, "is_admin", lambda uid: True)
-    monkeypatch.setattr(llm, "has_llm", lambda: False)
+    monkeypatch.setattr(llm, "has_text_llm", lambda: False)
     upd = _FakeUpdate(1)
     ctx = _FakeCtx(_db_path(tmp_path))
     asyncio.run(admin.review_run(upd, ctx))
-    assert upd.effective_message.replies == [i18n.t("admin.review_no_claude", "ru")]
+    assert upd.effective_message.replies == [i18n.t("admin.review_no_llm", "ru")]
 
 
 def test_review_run_allows_gemini_only_admin(monkeypatch, tmp_path):
@@ -56,6 +56,7 @@ def test_review_run_allows_gemini_only_admin(monkeypatch, tmp_path):
     monkeypatch.setattr(admin, "is_admin", lambda uid: True)
     monkeypatch.setattr(llm, "has_llm", lambda: True)
     monkeypatch.setattr(llm, "has_claude_vision", lambda: False)
+    monkeypatch.setattr(llm, "has_claude_text", lambda: False)
     upd = _FakeUpdate(1)
     ctx = _FakeCtx(_db_path(tmp_path), review_running=True)
     asyncio.run(admin.review_run(upd, ctx))

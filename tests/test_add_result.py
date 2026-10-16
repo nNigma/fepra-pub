@@ -5,7 +5,7 @@ def test_template_from_program_text():
     prog = ("2 ТА.\n- Е2МОМх5х5х80%\nприседание со штангой на спине\n"
             "4 AMRAP 3 мин х 5 / 1 мин отдых\n- 16 рывков\n- 8 подтягивания\n")
     tmpl, blocks = template_from_program(prog)
-    assert "раунд 1 (вес×повторы): ___" in tmpl
+    assert "раунд 1 (вес×повторы):" in tmpl
     assert "AMRAP (5×3мин):" in tmpl
     assert any(b["format"] == "amrap_interval" for b in blocks)
 

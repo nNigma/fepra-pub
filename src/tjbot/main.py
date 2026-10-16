@@ -15,7 +15,8 @@ from tj import config as cfgmod
 from . import db as botdb
 from .handlers import (add_result, admin, bodyweight, club, coach, competition,
                        edit_workout, garmin as garmin_h, goal, meal, menu,
-                       nutrition_profile, onboarding, pro, program, record_workout)
+                       nutrition_profile, onboarding, pro, profile_edit, program,
+                       record_result, record_workout)
 from .handlers import self_feel as self_feel_h
 
 
@@ -51,6 +52,7 @@ def build_application() -> Application:
     app.add_handler(onboarding.handler())
     app.add_handler(record_workout.handler())
     app.add_handler(add_result.handler())
+    app.add_handler(record_result.handler())
     app.add_handler(bodyweight.handler())
     app.add_handler(edit_workout.handler())
     app.add_handler(goal.handler())
@@ -64,6 +66,7 @@ def build_application() -> Application:
     meal.register(app)      # до register_stubs: подменю Питания перекрывает заглушку
     coach.register(app)
     nutrition_profile.register(app)
+    app.add_handler(profile_edit.handler())
     menu.register_stubs(app)
     self_feel_h.register(app)
     from .handlers import watch as watch_handlers

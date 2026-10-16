@@ -37,6 +37,16 @@ def test_main_kb_sections(monkeypatch):
     for gone in ("Тренировки", "Сводка", "Цели"):
         assert gone not in texts, gone
 
+def test_main_kb_order(monkeypatch):
+    from tj import i18n
+    monkeypatch.setattr(menu, "is_admin", lambda tg: False)
+    order = ("btn.analytics", "btn.record", "btn.nutrition", "btn.club_section",
+             "btn.coach", "btn.goal_single", "btn.comp_section", "btn.feel",
+             "btn.profile", "btn.lang")
+    for lang in ("ru", "en"):
+        assert _texts(menu.main_kb(2, lang)) == [i18n.t(k, lang) for k in order]
+
+
 def test_main_kb_no_admin_for_user():
     from tjbot.handlers.menu import main_kb, BTN_ADMIN
     texts = [b.text for row in main_kb(1, "ru").keyboard for b in row]

@@ -7,6 +7,7 @@ from __future__ import annotations
 # canonical_id -> список вариантов написания (lowercase)
 MOVEMENTS: dict[str, list[str]] = {
     "thruster":            ["thruster", "thrusters", "трастер", "трастеры"],
+    "cluster":             ["cluster", "clusters", "кластер", "кластеры", "кластере"],
     "pull_up":             ["pull-up", "pull up", "pullups", "подтягивание", "подтягивания"],
     "chest_to_bar":        ["c2b", "chest-to-bar", "подтягивания до груди"],
     "toes_to_bar":         ["t2b", "toes-to-bar", "нкп", "ноги к перекладине", "носки к перекладине"],
@@ -14,6 +15,14 @@ MOVEMENTS: dict[str, list[str]] = {
     "wall_walk":           ["хпс", "wall walk", "хождение по стене", "хождение на руках"],
     "double_under":        ["du", "дп", "double under", "двойные прыжки", "двойные"],
     "single_under":        ["ос", "оп", "su", "single under", "одинарные прыжки", "одиночные прыжки"],
+    "bar_muscle_up":       ["bar muscle-up", "bar muscle up", "bmu", "бму", "выход силой",
+                            "выход силой на турнике", "выходы силой", "выход на турнике",
+                            "выходы на турнике", "выход на две", "выход на перекладине",
+                            "выход", "выходы", "выходов"],
+    "muscle_up":           ["muscle-up", "muscle up", "mu", "мап", "выход на кольцах",
+                            "выход силой на кольцах", "выходы на кольцах", "выход на кольца"],
+    "push_up":             ["push-up", "push up", "pushup", "push-ups", "отжимание", "отжимания",
+                            "отжиманий", "отжимания от пола"],
     "burpee":              ["burpee", "burpees", "бёрпи", "берпи"],
     "burpee_over_bar":     ["бчш", "б.чш", "burpee over bar", "бёрпи через штангу", "берпи через штангу"],
     "burpee_over_parapet": ["бчп", "burpee over parapet", "бёрпи через парапет", "берпи через парапет"],
@@ -35,8 +44,8 @@ MOVEMENTS: dict[str, list[str]] = {
     "push_press":          ["push press", "швунг", "швунги", "швунгов", "жимовой швунг", "толчковый швунг", "пуш пресс"],
     "clean_and_jerk":      ["clean and jerk", "c&j", "cj", "клин джерк", "клин-джерк", "взятие и толчок",
                             "взятие+толчок", "взятие + толчок", "взятие и толчок штанги", "толчок",
-                            "толчок штанги", "толчок с груди", "толчок от груди", "толчок в ножницы",
-                            "толчок в разножку", "split jerk", "sj", "взятие на грудь и толчок",
+                            "толчок штанги", "толчок в ножницы",
+                            "толчок в разножку", "взятие на грудь и толчок",
                             "взятие + швунг", "взятие+швунг", "взятие со швунгом",
                             "взятие + толчок в ножницы", "взятие+толчок в ножницы"],
     "front_squat":         ["фр.пр", "фр пр", "фр. пр", "фр. пр.", "front squat", "fs", "фронтальные приседания",
@@ -53,8 +62,19 @@ MOVEMENTS: dict[str, list[str]] = {
     "power_snatch":        ["рывок в стойку", "рывок в силовую", "пауэр рывок", "power snatch",
                             "силовой рывок", "рывок в полуподсед", "рывок в полуприсед", "пауэр сноуч"],
     "clean_floor":         ["взятие с пола", "взятие на грудь", "взятие на грудь с пола", "pc",
-                            "взятие штанги на грудь", "взятие в сед", "взятие с пола в сед", "взятие в разножку",
-                            "взятие в стойку", "взятие на грудь в стойку", "силовое взятие"],
+                            "взятие штанги на грудь", "взятие в сед", "взятие с пола в сед", "взятие в разножку"],
+    "power_clean":         ["power clean", "pc", "силовое взятие", "пауэр клин", "пауэр-клин",
+                            "взятие в стойку", "взятие на грудь в стойку", "взятие в полуприсед",
+                            "взятие в полуподсед", "взятие с пола в стойку"],
+    "jerk":                ["jerk", "jerks", "split jerk", "sj", "push jerk", "power jerk", "джерк",
+                            "толчок со стоек", "толчок с груди", "толчок от груди", "толчок со стоек в ножницы",
+                            "толчок с плеч", "jerk со стоек"],
+    "snatch_pull":         ["snatch pull", "тяга рывковая", "рывковая тяга", "тяга на рывок",
+                            "тяга для рывка", "тяга рывок"],
+    "clean_pull":          ["clean pull", "тяга классическая", "классическая тяга", "тяга на взятие",
+                            "тяга для взятия", "тяга толчковая", "толчковая тяга"],
+    "hang_snatch":         ["hang snatch", "рывок с виса", "рывок из виса", "рывок с виса в сед",
+                            "хэнг сноуч", "хенг сноуч"],
     "hang_clean":          ["взятие с виса", "взятие с виса на грудь", "взятий с виса на грудь", "hang clean",
                             "hpc", "хэнг клин", "хенг клин", "взятие на грудь с виса", "взятие с виса в сед"],
     "devil_press":         ["дж", "devil press", "дьявольский жим", "дьявольские жимы"],
@@ -69,17 +89,20 @@ MOVEMENTS: dict[str, list[str]] = {
 _LOOKUP = {alias: cid for cid, aliases in MOVEMENTS.items() for alias in aliases}
 
 CATEGORY: dict[str, str] = {
-    "thruster": "barbell", "deadlift": "barbell", "back_squat": "barbell",
+    "thruster": "barbell", "cluster": "barbell", "deadlift": "barbell", "back_squat": "barbell",
     "bench_press": "barbell", "shoulder_press": "barbell", "push_press": "barbell", "clean_and_jerk": "barbell",
     "front_squat": "barbell", "overhead_squat": "barbell", "clean": "barbell",
     "snatch": "barbell", "squat_snatch": "barbell", "power_snatch": "barbell",
     "clean_floor": "barbell", "hang_clean": "barbell",
+    "power_clean": "barbell", "jerk": "barbell", "snatch_pull": "barbell",
+    "clean_pull": "barbell", "hang_snatch": "barbell",
     "devil_press": "dumbbell", "kb_clean_jerk": "kb",
     "wall_ball": "medball", "walking_lunge": "dumbbell",
     "pull_up": "gymnastics", "chest_to_bar": "gymnastics", "toes_to_bar": "gymnastics",
     "hspu": "gymnastics", "wall_walk": "gymnastics", "double_under": "gymnastics",
     "single_under": "gymnastics", "burpee": "gymnastics", "burpee_over_bar": "gymnastics",
     "burpee_over_parapet": "gymnastics", "box_jump": "gymnastics", "box_jump_over": "gymnastics",
+    "bar_muscle_up": "gymnastics", "muscle_up": "gymnastics", "push_up": "gymnastics",
     "bike": "cardio", "row": "cardio", "shuttle_run": "cardio",
 }
 _WEIGHTED_CATS = {"barbell", "dumbbell", "kb", "medball"}
@@ -88,10 +111,22 @@ WEIGHTED = {cid for cid, cat in CATEGORY.items() if cat in _WEIGHTED_CATS}
 # Общий канон, требующий уточнения варианта при записи в цели.
 _VARIANT_FAMILY = {"snatch": "snatch", "clean": "clean"}
 
+# Компаунд = 2 упражнения в одном: макс кластера засчитывается в обе дисциплины.
+COMPOUND: dict[str, list[str]] = {"cluster": ["clean_floor", "thruster"]}
+
 
 def variant_family(canon: str | None) -> str | None:
     """'snatch'|'clean' если движение общее и нужен вопрос о варианте, иначе None."""
     return _VARIANT_FAMILY.get(canon)
+
+
+def is_compound(canon: str | None) -> bool:
+    return canon in COMPOUND
+
+
+def compound(canon: str | None) -> list[str] | None:
+    """Компоненты компаунда (кластер -> [взятие с пола, трастер]), иначе None."""
+    return COMPOUND.get(canon) if canon else None
 
 
 def category(canon: str | None) -> str | None:
@@ -100,6 +135,14 @@ def category(canon: str | None) -> str | None:
 
 def is_weighted(canon: str | None) -> bool:
     return canon in WEIGHTED
+
+
+def base_ru(canon: str | None) -> str | None:
+    """Базовое русское написание канона (первый кириллический алиас) для меток шаблона."""
+    for a in MOVEMENTS.get(canon or "", []):
+        if any("а" <= ch.lower() <= "я" for ch in a):
+            return a
+    return None
 
 
 def resolve(text: str, aliases: dict[str, str] | None = None) -> str | None:

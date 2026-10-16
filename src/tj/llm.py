@@ -6,6 +6,7 @@ import base64
 import fcntl
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -141,15 +142,27 @@ def complete(system: str, user: str, *, max_output_tokens: int = 800, model: str
 def vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/jpeg",
            max_output_tokens: int = 1200, model: str | None = None,
            engine: str = "gemini", claude_model: str = "sonnet") -> str | None:
-    """Роутер зрения: engine="claude" — Claude CLI по подписке (фолбэк на Gemini
-    при любом сбое), иначе Gemini API. claude_model: sonnet — доски (быстро),
-    opus — еда (лучше счёт объектов и классификация)."""
-    if engine == "claude":
-        out = claude_vision(image_bytes, prompt, media_type=media_type,
+    """Роутер зрения: engine="agent" — через внешний хелпер (opt-in), engine="claude" —
+    Claude CLI по подписке, иначе Gemini API. При любом сбое верхнего движка —
+    фолбэк на Gemini. claude_model: sonnet — доски (быстро), opus — еда."""
+    if engine == "agent":
+        try:
+            out = agent_run(prompt, image_bytes=image_bytes, media_type=media_type,
                             model=claude_model)
-        if out:
-            return out
-        print("[llm] claude_vision не ответил, фолбэк на gemini", flush=True)
+            if out:
+                return out
+            print("[llm] agent не ответил, фолбэк на gemini", flush=True)
+        except Exception as e:
+            print(f"[llm] agent_vision упал ({type(e).__name__}: {e}), фолбэк на gemini", flush=True)
+    elif engine == "claude":
+        try:
+            out = claude_vision(image_bytes, prompt, media_type=media_type,
+                                model=claude_model)
+            if out:
+                return out
+            print("[llm] claude_vision не ответил, фолбэк на gemini", flush=True)
+        except Exception as e:
+            print(f"[llm] claude_vision упал ({type(e).__name__}: {e}), фолбэк на gemini", flush=True)
     attempts = _attempts(paid=True, model=model)
     if not attempts:
         return None
@@ -159,6 +172,141 @@ def vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/jpeg",
         {"text": prompt},
     ]}]
     return _run(contents, attempts, max_output_tokens, 0.2, 90.0, "vision")
+
+
+# --- Внешний инференс-хелпер (opt-in): зрение + текст ---------------------------
+# Выключен, пока не задан FEPRA_AGENT_HELPER (путь к скрипту-обёртке) и
+# FEPRA_LLM_ENGINE=agent. Хелпер получает файл промпта, файл картинки и имя модели,
+# печатает JSON с текстом. FEPRA_AGENT_USER — запуск от имени другого пользователя
+# (su), если сервис работает от root. Промпт идёт файлом: в argv не влезает и
+# светился бы в ps.
+
+_AGENT_MODELS = {"sonnet": "anthropic/claude-sonnet-5",
+                 "opus": "anthropic/claude-opus-4-8"}
+
+
+def _agent_helper() -> str | None:
+    p = os.environ.get("FEPRA_AGENT_HELPER")
+    return p if p and os.path.exists(p) else None
+
+
+def has_agent() -> bool:
+    return bool(_agent_helper())
+
+
+def agent_run(prompt: str, *, image_bytes: bytes | None = None,
+              media_type: str = "image/jpeg", model: str = "sonnet",
+              timeout: float = 180.0) -> str | None:
+    """Один ход модели через агента. Возвращает текст или None (тогда фолбэк)."""
+    helper = _agent_helper()
+    if not helper:
+        return None
+    full_model = _AGENT_MODELS.get(model, model)
+    with tempfile.TemporaryDirectory(prefix="tj-agent-") as td:
+        os.chmod(td, 0o755)
+        pf = os.path.join(td, "prompt.txt")
+        with open(pf, "w", encoding="utf-8") as f:
+            f.write(prompt)
+        os.chmod(pf, 0o644)
+        img = ""
+        if image_bytes:
+            img = os.path.join(td, "image" + _CLAUDE_EXT.get(media_type, ".jpg"))
+            with open(img, "wb") as f:
+                f.write(image_bytes)
+            os.chmod(img, 0o644)
+        inner = " ".join(shlex.quote(x) for x in (helper, pf, img, full_model))
+        run_as = os.environ.get("FEPRA_AGENT_USER")
+        cmd = (["su", "-", run_as, "-c", inner] if run_as and os.geteuid() == 0
+               else [helper, pf, img, full_model])
+        t0 = time.time()
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if proc.returncode != 0:
+            print(f"[llm] agent rc={proc.returncode}: {proc.stderr.strip()[:160]}", flush=True)
+            return None
+        raw = proc.stdout.strip()
+        if not raw.startswith("{"):
+            # CLI иногда печатает диагностику перед JSON — берём с первой скобки
+            i = raw.find("{")
+            raw = raw[i:] if i >= 0 else raw
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            print("[llm] agent вернул не JSON", flush=True)
+            return None
+        text = _agent_text(data)
+        print(f"[llm] agent ok model={full_model} {time.time() - t0:.1f}s", flush=True)
+        return text
+
+
+def _agent_text(data: dict) -> str | None:
+    """Достаёт текст из ответа `infer model run --json` в любом из форматов."""
+    if not isinstance(data, dict) or data.get("ok") is False:
+        return None
+    outs = data.get("outputs")
+    if isinstance(outs, list) and outs:
+        first = outs[0]
+        if isinstance(first, dict):
+            for k in ("text", "content", "output"):
+                if isinstance(first.get(k), str) and first[k].strip():
+                    return first[k]
+        elif isinstance(first, str) and first.strip():
+            return first
+    for k in ("text", "content", "output"):
+        if isinstance(data.get(k), str) and data[k].strip():
+            return data[k]
+    return None
+
+
+def subscription_complete(prompt: str, *, engine: str = "claude",
+                         model: str = "sonnet", timeout: float = 150.0) -> str | None:
+    """Текст по подписке: агент или Claude CLI. Любой сбой -> None, звонящий
+    фолбэчит на Gemini. Исключения наружу не выпускаем: сбой инфраструктуры не
+    должен выглядеть как отказ задачи."""
+    try:
+        if engine == "agent":
+            return agent_run(prompt, model=model, timeout=timeout)
+        if engine == "claude":
+            return claude_complete(prompt, model=model, timeout=timeout)
+    except Exception as e:
+        print(f"[llm] subscription_complete упал ({type(e).__name__}: {e})", flush=True)
+    return None
+
+
+def has_text_llm() -> bool:
+    """Есть ли хоть один движок для текстовых разборов (agent/claude/gemini)."""
+    want = (os.environ.get("FEPRA_LLM_ENGINE") or "claude").strip().lower()
+    if want == "agent" and has_agent():
+        return True
+    if has_claude_text():
+        return True
+    return has_llm()
+
+
+def text_complete(prompt: str, *, timeout: float = 150.0,
+                  gemini_system: str | None = None,
+                  gemini_user: str | None = None,
+                  max_output_tokens: int = 2200) -> tuple[str | None, str | None]:
+    """Текстовый разбор: agent/claude по FEPRA_LLM_ENGINE, затем Gemini.
+    -> (text | None, engine | None). gemini_system/user — отдельные части для
+    Gemini-фолбэка (coach); без них уходит весь prompt одним user-сообщением."""
+    want = (os.environ.get("FEPRA_LLM_ENGINE") or "claude").strip().lower()
+    if want == "agent" and has_agent():
+        text = subscription_complete(prompt, engine="agent", timeout=timeout)
+        if text:
+            return text, "agent"
+    if has_claude_text():
+        text = subscription_complete(prompt, engine="claude", timeout=timeout)
+        if text:
+            return text, "claude"
+    if has_llm():
+        if gemini_system is not None and gemini_user is not None:
+            text = complete(gemini_system, gemini_user,
+                            max_output_tokens=max_output_tokens, paid=True)
+        else:
+            text = complete("", prompt, max_output_tokens=max_output_tokens, paid=True)
+        if text:
+            return text, "gemini"
+    return None, None
 
 
 # --- Claude CLI (headless `claude -p`): зрение + текст --------------------------
@@ -248,6 +396,12 @@ def claude_vision(image_bytes: bytes, prompt: str, *, media_type: str = "image/j
             with open(os.path.join(td, "board" + ext), "wb") as f:
                 f.write(image_bytes)
             return _claude_run(full, td, timeout, "claude_vision", model=model)
+
+
+def has_claude_text() -> bool:
+    """Claude для текста: включён и есть CLI или ANTHROPIC_API_KEY."""
+    from tj.config import claude_enabled
+    return claude_enabled() and bool(_claude_bin() or _anthropic_key())
 
 
 def _anthropic_key() -> str | None:

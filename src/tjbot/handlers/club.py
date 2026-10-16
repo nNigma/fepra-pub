@@ -1,4 +1,5 @@
-"""Программа зала Universe: просмотр (всем) + добавление/правка (админ).
+"""Программа зала: просмотр (всем, по своему залу) + добавление/правка
+(админ или тренер зала).
 
 Под-меню (механизм из A): просмотр - обычные хендлеры, добавление -
 ConversationHandler с распознаванием фото/текста через Gemini и стандартизацией
@@ -17,7 +18,7 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
 
 from tj import i18n, ontology
 
-from .. import activity
+from .. import access, activity
 from .. import db as botdb
 from ..access import is_admin
 from . import menu
@@ -29,6 +30,21 @@ BTN_CLUB_DATE = "📅 На дату"
 BTN_CLUB_STATS = "📊 Стата зала"
 BTN_CLUB_ADD = "➕ Добавить"
 BTN_CLUB_EDIT = "✏️ Редактировать программу"
+BTN_CLUB_ATHLETES = "👥 Атлеты зала"
+
+
+def target_gym(con, tg_id: int) -> str:
+    g = access.coach_gym(tg_id)
+    if g and botdb.gym_exists(con, g):
+        return g
+    u = botdb.get_user(con, tg_id)
+    if u and u["gym"] and botdb.gym_exists(con, u["gym"]):
+        return u["gym"]
+    return botdb.default_gym(con)
+
+
+def can_manage(tg_id: int, gym: str) -> bool:
+    return is_admin(tg_id) or access.coach_gym(tg_id) == gym
 
 VIEW_DATE, ADD_DATE, ADD_DATE_INPUT, ADD_INPUT, ADD_ENGINE, ADD_CONFIRM, ADD_MOVE = range(7)
 
@@ -52,10 +68,11 @@ def _offer_engine_choice() -> bool:
     return vision.has_claude()
 
 
-def club_kb(admin: bool, lang: str = "ru") -> ReplyKeyboardMarkup:
+def club_kb(manage: bool, lang: str = "ru") -> ReplyKeyboardMarkup:
     rows = [[i18n.t("btn.club_date", lang), i18n.t("btn.club_stats", lang)]]
-    if admin:
+    if manage:
         rows.append([i18n.t("btn.club_add", lang), i18n.t("btn.club_edit", lang)])
+        rows.append([i18n.t("btn.club_athletes", lang)])
     rows.append([i18n.t("btn.back", lang)])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -121,7 +138,8 @@ def _chunks(text: str, limit: int = 3500) -> list[str]:
 def _fmt_program(row, lang: str = "ru") -> str:
     if not row:
         return ""
-    return i18n.t("club.program_header", lang, day=row["day"], text=row["raw_text"])
+    return i18n.t("club.program_header", lang, gym=row["gym"], day=row["day"],
+                  text=row["raw_text"])
 
 
 def _fmt_stats(rows, lang: str = "ru") -> str:
@@ -138,14 +156,16 @@ def _restandardize(con, draft) -> None:
     draft["canon"], draft["unknown"] = movements_of(blocks)
 
 
+@access.restricted
 async def open_club(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     con = botdb.connect(context.bot_data["db_path"])
     try:
         lang = botdb.user_lang(con, uid)
+        g = target_gym(con, uid)
         today = datetime.now(_tz(context)).date().isoformat()
-        row = botdb.get_program(con, today, "Universe")
-        last = None if row else botdb.last_program(con)
+        row = botdb.get_program(con, today, g)
+        last = None if row else botdb.last_program(con, g)
     finally:
         con.close()
     if row:
@@ -154,20 +174,59 @@ async def open_club(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = i18n.t("club.no_program_last", lang, day=last["day"])
     else:
         msg = i18n.t("club.no_program_yet", lang)
-    await update.effective_message.reply_text(msg, reply_markup=club_kb(is_admin(uid), lang))
+    await update.effective_message.reply_text(msg, reply_markup=club_kb(can_manage(uid, g), lang))
 
 
+@access.restricted
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     from tj.analysis import gym
     uid = update.effective_user.id
     con = botdb.connect(context.bot_data["db_path"])
     try:
         lang = botdb.user_lang(con, uid)
-        rows = gym.movement_frequency(con, "Universe", lang=lang)
+        g = target_gym(con, uid)
+        rows = gym.movement_frequency(con, g, lang=lang)
     finally:
         con.close()
     await update.effective_message.reply_text(
-        _fmt_stats(rows, lang), reply_markup=club_kb(is_admin(uid), lang))
+        _fmt_stats(rows, lang), reply_markup=club_kb(can_manage(uid, g), lang))
+
+
+def _athletes_text(con, gym: str, since_day: str, lang: str) -> str:
+    members = botdb.gym_members(con, gym)
+    if not members:
+        return i18n.t("club.athletes_empty", lang)
+    ph = ",".join("?" * len(members))
+    rows = con.execute(
+        f'SELECT "tg_id", SUM(m) AS n FROM ('
+        f'  SELECT "tg_id", MAX(c) AS m FROM ('
+        f'    SELECT "tg_id","day","sport","source", COUNT(*) AS c FROM activities'
+        f'    WHERE "day">=? AND "sport" IS NOT NULL AND "tg_id" IN ({ph})'
+        f'    GROUP BY "tg_id","day","sport","source")'
+        f'  GROUP BY "tg_id","day","sport")'
+        f'GROUP BY "tg_id"',
+        (since_day, *[m["tg_id"] for m in members])).fetchall()
+    counts = {r["tg_id"]: r["n"] for r in rows}
+    lines = [i18n.t("club.athletes_line", lang, name=m["nick"] or m["tg_id"],
+                    n=counts.get(m["tg_id"], 0)) for m in members]
+    return i18n.t("club.athletes_header", lang, gym=gym, lines="\n".join(lines))
+
+
+@access.restricted
+async def athletes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        lang = botdb.user_lang(con, uid)
+        g = target_gym(con, uid)
+        if not can_manage(uid, g):
+            await update.effective_message.reply_text(i18n.t("club.manage_only", lang))
+            return
+        since = (datetime.now(_tz(context)).date() - timedelta(days=30)).isoformat()
+        text = _athletes_text(con, g, since, lang)
+    finally:
+        con.close()
+    await update.effective_message.reply_text(text, reply_markup=club_kb(True, lang))
 
 
 async def view_date_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -198,7 +257,7 @@ async def view_date_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     d = today if q.data == "cvd:today" else today - timedelta(days=1)
     con = botdb.connect(context.bot_data["db_path"])
     try:
-        row = botdb.get_program(con, d.isoformat(), "Universe")
+        row = botdb.get_program(con, d.isoformat(), target_gym(con, q.from_user.id))
     finally:
         con.close()
     text = _fmt_program(row, lang) if row else i18n.t("club.no_program_on_date", lang, day=d)
@@ -215,12 +274,12 @@ async def view_date_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     uid = update.effective_user.id
     con = botdb.connect(context.bot_data["db_path"])
     try:
-        row = botdb.get_program(con, d.isoformat(), "Universe")
+        g = target_gym(con, uid)
+        row = botdb.get_program(con, d.isoformat(), g)
     finally:
         con.close()
-    admin = is_admin(uid)
     text = _fmt_program(row, lang) if row else i18n.t("club.no_program_on_date", lang, day=d)
-    await update.message.reply_text(text, reply_markup=club_kb(admin, lang))
+    await update.message.reply_text(text, reply_markup=club_kb(can_manage(uid, g), lang))
     return ConversationHandler.END
 
 
@@ -238,14 +297,24 @@ async def _lang_for(context: ContextTypes.DEFAULT_TYPE, uid: int) -> str:
         con.close()
 
 
+def _manage_gym_for(context: ContextTypes.DEFAULT_TYPE, uid: int) -> str:
+    con = botdb.connect(context.bot_data["db_path"])
+    try:
+        return target_gym(con, uid)
+    finally:
+        con.close()
+
+
 async def add_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = update.effective_user.id
     lang = await _lang_for(context, uid)
-    if not is_admin(uid):
-        await update.effective_message.reply_text(i18n.t("club.admin_only", lang))
+    g = _manage_gym_for(context, uid)
+    if not can_manage(uid, g):
+        await update.effective_message.reply_text(i18n.t("club.manage_only", lang))
         return ConversationHandler.END
     context.user_data["cedit"] = False
     context.user_data["lang"] = lang
+    context.user_data["cgym"] = g
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton(i18n.t("club.today", lang), callback_data="cadd:today"),
         InlineKeyboardButton(i18n.t("club.yesterday", lang), callback_data="cadd:yesterday"),
@@ -258,11 +327,13 @@ async def add_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def edit_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = update.effective_user.id
     lang = await _lang_for(context, uid)
-    if not is_admin(uid):
-        await update.effective_message.reply_text(i18n.t("club.admin_only", lang))
+    g = _manage_gym_for(context, uid)
+    if not can_manage(uid, g):
+        await update.effective_message.reply_text(i18n.t("club.manage_only", lang))
         return ConversationHandler.END
     context.user_data["cedit"] = True
     context.user_data["lang"] = lang
+    context.user_data["cgym"] = g
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton(i18n.t("club.today", lang), callback_data="cadd:today"),
         InlineKeyboardButton(i18n.t("club.yesterday", lang), callback_data="cadd:yesterday"),
@@ -278,7 +349,7 @@ async def _show_existing_program(message, context: ContextTypes.DEFAULT_TYPE, da
     lang = context.user_data.get("lang", "ru")
     con = botdb.connect(context.bot_data["db_path"])
     try:
-        row = botdb.get_program(con, day.isoformat(), "Universe")
+        row = botdb.get_program(con, day.isoformat(), context.user_data.get("cgym"))
     finally:
         con.close()
     if row:
@@ -389,8 +460,29 @@ async def add_retry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await _parse_add_photo(q.message, context, lang, "gemini")
 
 
+# Собственные заголовки-обёртки бота ("Программа:", "Текущая программа:",
+# "Программа Universe на …:", EN-аналоги). Срезаем на входе, чтобы вставленная
+# обратно программа не копила префиксы (баг с задвоением "Программа:").
+_PROG_WRAPPER = re.compile(
+    r"^\s*(?:программа\b[^\n:]*:"
+    r"|текущая\s+программа:"
+    r"|program\b[^\n:]*:"
+    r"|current\s+program:"
+    r"|gym\s+program[^\n:]*:)\s*\n+", re.IGNORECASE)
+
+
+def _strip_program_wrappers(text: str) -> str:
+    t = text or ""
+    prev = None
+    while t != prev:
+        prev = t
+        t = _PROG_WRAPPER.sub("", t, count=1)
+    return t.strip()
+
+
 async def _finish_add_input(msg, context: ContextTypes.DEFAULT_TYPE, raw_text: str, source: str) -> int:
     lang = context.user_data.get("lang", "ru")
+    raw_text = _strip_program_wrappers(raw_text)
     if not raw_text or len(raw_text.strip()) < 4:
         await msg.reply_text(i18n.t("club.empty_send_again", lang))
         return ADD_INPUT
@@ -410,23 +502,28 @@ async def _finish_add_input(msg, context: ContextTypes.DEFAULT_TYPE, raw_text: s
     return ADD_CONFIRM
 
 
+def _confirm_kb(d: dict, lang: str) -> InlineKeyboardMarkup:
+    rows = [[
+        InlineKeyboardButton(i18n.t("club.btn_confirm", lang), callback_data="cok"),
+        InlineKeyboardButton(i18n.t("club.btn_fix", lang), callback_data="cedit"),
+    ]]
+    if d.get("unknown") or not d.get("canon"):
+        rows.append([InlineKeyboardButton(i18n.t("club.btn_add_move", lang), callback_data="cmv")])
+    return InlineKeyboardMarkup(rows)
+
+
 async def _show_confirm(message, context: ContextTypes.DEFAULT_TYPE) -> None:
     from tj.analysis.wod_program import annotate
     lang = context.user_data.get("lang", "ru")
     d = context.user_data["draft"]
+    await message.reply_text(i18n.t("club.program_word", lang))
     await message.reply_text(
         i18n.t("club.program_body", lang, annotated=annotate(d["raw_text"])[:3500]))
     names = ", ".join(d["canon"]) or i18n.t("club.dash", lang)
     body = i18n.t("club.movements_line", lang, names=names)
     if d["unknown"]:
         body += i18n.t("club.unknown_movements", lang, names=", ".join(d["unknown"]))
-    rows = [[
-        InlineKeyboardButton(i18n.t("club.btn_confirm", lang), callback_data="cok"),
-        InlineKeyboardButton(i18n.t("club.btn_fix", lang), callback_data="cedit"),
-    ]]
-    if d["unknown"]:
-        rows.append([InlineKeyboardButton(i18n.t("club.btn_add_move", lang), callback_data="cmv")])
-    await message.reply_text(body, reply_markup=InlineKeyboardMarkup(rows))
+    await message.reply_text(body, reply_markup=_confirm_kb(d, lang))
 
 
 async def add_map(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -584,22 +681,24 @@ async def add_ok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # форму без своих обращений к ИИ. Сбой -> blocks NULL, перепарсят raw_text.
     vblocks = None
     blocks = parse_program(d["raw_text"], aliases)
-    if blocks and vision.engine_for(update.effective_user.id) == "claude" and vision.has_claude():
+    eng = vision.engine_for(update.effective_user.id)
+    if blocks and vision.subscription_ready(eng):
         await q.edit_message_text(i18n.t("club.checking_template", lang))
         checked, verified = vision.verify_result_blocks(d["raw_text"], blocks, aliases)
         if verified:
             vblocks = checked
     con = botdb.connect(context.bot_data["db_path"])
     try:
+        gym = context.user_data.get("cgym") or botdb.default_gym(con)
         con.execute('DELETE FROM wod_programs WHERE "day"=? AND "gym"=?',
-                    (day.isoformat(), "Universe"))
-        botdb.add_program(con, day.isoformat(), "Universe", d["raw_text"],
+                    (day.isoformat(), gym))
+        botdb.add_program(con, day.isoformat(), gym, d["raw_text"],
                           fmt=d["format"], movements=d["canon"], source=d["source"],
                           confirmed=1, blocks=vblocks)
     finally:
         con.close()
     activity.log(context, update.effective_user.id, activity.CLUB_PROGRAM_ADDED)
-    await q.edit_message_text(i18n.t("club.program_saved", lang, day=day))
+    await q.edit_message_text(i18n.t("club.program_saved", lang, gym=gym, day=day))
     context.user_data.clear()
     await show_menu(update, context, "menu.done")
     return ConversationHandler.END
@@ -660,5 +759,6 @@ def _add_conv() -> ConversationHandler:
 def register(app) -> None:
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.club_section")), open_club))
     app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.club_stats")), stats))
+    app.add_handler(MessageHandler(filters.Text(menu.btn_variants("btn.club_athletes")), athletes))
     app.add_handler(_view_conv())
     app.add_handler(_add_conv())

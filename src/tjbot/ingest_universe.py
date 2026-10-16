@@ -101,8 +101,8 @@ async def _listen():
     if not chat_id:
         raise SystemExit("Нет UNIVERSE_CHAT_ID — запусти `ingest_universe list` и впиши в .env.")
 
-    from .access import load_allow
-    admin_ids = sorted(load_allow())
+    from .access import load_admins
+    admin_ids = sorted(load_admins())
     db_path = str(botdb.default_db_path())
     data_dir = Path(__file__).resolve().parents[2] / "raw" / "universe"
     data_dir.mkdir(parents=True, exist_ok=True)

@@ -16,7 +16,7 @@ from .. import db as botdb
 from ..access import is_allowed
 from .menu import show_menu
 
-NICK, HEIGHT, WEIGHT, SEX, AGE, GYM = range(6)
+NICK, HEIGHT, WEIGHT, SEX, AGE, GYM, GUIDE = range(7)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -32,6 +32,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     existing = botdb.get_user(con, user.id)
     con.close()
     if existing:
+        if context.args and context.args[0] == "pm":
+            from .record_result import send_kind_prompt
+            await send_kind_prompt(update.effective_message, lang)
+            return ConversationHandler.END
         await show_menu(update, context, "menu.welcome_back", nick=existing["nick"])
         return ConversationHandler.END
     await update.effective_message.reply_text(
@@ -91,20 +95,29 @@ async def get_sex(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return AGE
 
 
+def _gym_kb(con, lang: str) -> InlineKeyboardMarkup:
+    rows = []
+    for g in botdb.list_gyms(con):
+        label = (i18n.t("onboarding.btn_gym_default", lang, name=g["name"])
+                 if g["is_default"] else g["name"])
+        rows.append([InlineKeyboardButton(label, callback_data=f"gym:{g['name']}")])
+    rows.append([InlineKeyboardButton(i18n.t("onboarding.btn_gym_other", lang), callback_data="gym:other")])
+    rows.append([InlineKeyboardButton(i18n.t("onboarding.btn_gym_solo", lang), callback_data="gym:solo")])
+    return InlineKeyboardMarkup(rows)
+
+
 async def get_age(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     con = botdb.connect(context.bot_data["db_path"])
-    lang = botdb.user_lang(con, update.effective_user.id)
-    con.close()
-    txt = update.message.text.strip()
-    if not txt.isdigit() or not (10 <= int(txt) <= 100):
-        await update.message.reply_text(i18n.t("onboarding.age_invalid", lang))
-        return AGE
-    context.user_data["age"] = int(txt)
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton(i18n.t("onboarding.btn_gym_universe", lang), callback_data="gym:Universe")],
-        [InlineKeyboardButton(i18n.t("onboarding.btn_gym_other", lang), callback_data="gym:other")],
-        [InlineKeyboardButton(i18n.t("onboarding.btn_gym_solo", lang), callback_data="gym:solo")],
-    ])
+    try:
+        lang = botdb.user_lang(con, update.effective_user.id)
+        txt = update.message.text.strip()
+        if not txt.isdigit() or not (10 <= int(txt) <= 100):
+            await update.message.reply_text(i18n.t("onboarding.age_invalid", lang))
+            return AGE
+        context.user_data["age"] = int(txt)
+        kb = _gym_kb(con, lang)
+    finally:
+        con.close()
     await update.message.reply_text(i18n.t("onboarding.ask_gym", lang), reply_markup=kb)
     return GYM
 
@@ -120,8 +133,36 @@ async def get_gym(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     weight_kg=ud["weight_kg"], sex=ud["sex"], age=ud["age"], gym=gym)
     con.close()
     await q.edit_message_text(i18n.t("onboarding.gym_chosen", lang, gym=gym))
-    await show_menu(update, context, "menu.profile_saved")
     ud.clear()
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        i18n.t("onboarding.btn_guide_ok", lang), callback_data="guideok")]])
+    msg = await q.message.reply_text(i18n.t("onboarding.results_guide", lang), reply_markup=kb)
+    if msg is not None:
+        ud["guide_msg_id"] = msg.message_id
+    return GUIDE
+
+
+async def guide_ok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    con = botdb.connect(context.bot_data["db_path"])
+    lang = botdb.user_lang(con, q.from_user.id)
+    con.close()
+    context.user_data.pop("guide_msg_id", None)
+    await q.edit_message_text(i18n.t("onboarding.results_guide", lang))
+    await show_menu(update, context, "menu.profile_saved")
+    return ConversationHandler.END
+
+
+async def guide_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    mid = context.user_data.pop("guide_msg_id", None)
+    if mid is not None:
+        try:
+            await context.bot.edit_message_reply_markup(
+                chat_id=update.effective_chat.id, message_id=mid, reply_markup=None)
+        except Exception:
+            pass
+    await show_menu(update, context, "menu.profile_saved")
     return ConversationHandler.END
 
 
@@ -141,6 +182,8 @@ def handler() -> ConversationHandler:
             SEX: [CallbackQueryHandler(get_sex, pattern=r"^sex:")],
             AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_age)],
             GYM: [CallbackQueryHandler(get_gym, pattern=r"^gym:")],
+            GUIDE: [CallbackQueryHandler(guide_ok, pattern=r"^guideok$"),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, guide_text)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         name="onboarding",

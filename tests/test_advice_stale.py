@@ -26,6 +26,20 @@ def test_advice_created_at_full_timestamp():
     assert "T" in created  # полный ISO-таймстамп, не только дата
 
 
+def test_meal_does_not_bump_data_version():
+    con = _con()
+    assert botdb.data_version(con) is None
+    botdb.add_meal(con, 1, "2026-07-13", "2026-07-13T08:00:00+00:00",
+                   [{"name": "каша"}], {"kcal": 500})
+    assert botdb.data_version(con) is None
+
+
+def test_self_feel_still_bumps_data_version():
+    con = _con()
+    botdb.set_self_feel(con, "2026-07-13", 7, tg_id=1)
+    assert botdb.data_version(con) is not None
+
+
 def test_stale_when_data_newer_than_advice():
     con = _con()
     botdb.next_advice_put(con, 1, "claude", "совет",

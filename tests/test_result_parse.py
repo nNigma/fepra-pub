@@ -38,3 +38,13 @@ def test_parse_lift_unit_suffix():
 def test_parse_benchmark_rejects_bad_time():
     assert parse_benchmark("4:60", "time") is None
     assert parse_benchmark("-1:00", "time") is None
+
+
+def test_est_1rm_single_rep_is_weight():
+    from tjbot.handlers.record_result import est_1rm_for
+    assert est_1rm_for(80.0, 1) == 80.0
+
+
+def test_est_1rm_multi_rep_epley():
+    from tjbot.handlers.record_result import est_1rm_for
+    assert est_1rm_for(70.0, 3) == 77.0

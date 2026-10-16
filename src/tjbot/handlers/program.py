@@ -11,10 +11,15 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, ContextTypes,
 
 from tj import i18n
 from .. import db as botdb
-from ..access import is_allowed
+from ..access import is_admin, is_coach
 from . import menu
 
 EDIT = 0
+
+
+def _may_manage(uid: int) -> bool:
+    """Подтверждать программу зала могут только админ и тренер."""
+    return is_admin(uid) or is_coach(uid)
 
 
 async def _lang_for(context: ContextTypes.DEFAULT_TYPE, uid: int) -> str:
@@ -28,7 +33,7 @@ async def _lang_for(context: ContextTypes.DEFAULT_TYPE, uid: int) -> str:
 async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not is_allowed(q.from_user.id):
+    if not _may_manage(q.from_user.id):
         return
     lang = context.user_data.get("lang") or await _lang_for(context, q.from_user.id)
     pid = int(q.data.split(":")[1])
@@ -43,7 +48,7 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
-    if not is_allowed(q.from_user.id):
+    if not _may_manage(q.from_user.id):
         return ConversationHandler.END
     lang = context.user_data.get("lang") or await _lang_for(context, q.from_user.id)
     context.user_data["lang"] = lang

@@ -60,6 +60,27 @@ def test_ask_both_fail(monkeypatch):
     assert engine.ask("x.db", 1, "вопрос") == (None, None)
 
 
+def test_coach_payload_merges_garmin_manual_same_day(tmp_path):
+    from datetime import date
+    dbp = str(tmp_path / "t.db")
+    con = db.connect(dbp)
+    db.init_schema(con)
+    con.execute('INSERT INTO activities ("tg_id","day","sport","activity_id","source") '
+                'VALUES (?,?,?,?,?)', (1, "2026-07-15", "crossfit", "m-1", "manual"))
+    con.execute('INSERT INTO activities ("tg_id","day","sport","activity_id","source") '
+                'VALUES (?,?,?,?,?)', (1, "2026-07-15", "crossfit", "g-1", "garmin"))
+    con.execute('INSERT INTO activities ("tg_id","day","sport","activity_id","source") '
+                'VALUES (?,?,?,?,?)', (1, "2026-07-14", "run", "g-2", "garmin"))
+    con.execute('INSERT INTO daily ("day","resting_hr","tg_id") VALUES (?,?,?)',
+                ("2026-07-15", 50, 1))
+    con.commit()
+    con.close()
+    payload = engine.coach_payload(dbp, 1, today=date(2026, 7, 16))
+    sports = {s["sport"]: s["n"] for s in payload["main_sports"]}
+    assert sports == {"crossfit": 1, "run": 1}
+    assert len(payload["recent_workouts"]) == 2
+
+
 def test_coach_count_today(tmp_path):
     con = _con(tmp_path)
     db.add_coach_qa(con, 1, "2026-07-09T10:00:00", "q1", "a1")

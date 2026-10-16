@@ -337,8 +337,8 @@ def coach(kind: str, payload: dict, lang: str = "ru",
     cap = (f"Write densely; keep the whole answer under ~{limit} characters."
            if lang == "en" else
            f"Пиши плотно; весь ответ — не длиннее ~{limit} знаков.")
-    text = llm.claude_complete(f"{system}\n{cap}\n\nДАННЫЕ:\n{body}")
-    if text:
-        return text, "claude"
+    prompt = f"{system}\n{cap}\n\nДАННЫЕ:\n{body}"
     max_tok = 2600 if kind == "summary" else (2200 if kind == "workout" else 1600)
-    return llm.complete(system, body, max_output_tokens=max_tok), "gemini"
+    text, engine = llm.text_complete(prompt, gemini_system=system, gemini_user=body,
+                                     max_output_tokens=max_tok)
+    return text, engine or "gemini"

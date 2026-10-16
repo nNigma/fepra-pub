@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse
 
 from tj import config as cfgmod
 from tj.adapters import whoop
+from tj.services.urls import public_link
 from tjbot import db as botdb
 
 router = APIRouter()
@@ -29,8 +30,7 @@ def whoop_creds() -> tuple[str, str]:
 
 
 def redirect_uri() -> str:
-    base = os.environ.get("MINIAPP_URL", "https://your-domain.example.org").rstrip("/")
-    return os.environ.get("WHOOP_REDIRECT_URI") or f"{base}/whoop/callback"
+    return os.environ.get("WHOOP_REDIRECT_URI") or public_link("/whoop/callback")
 
 
 def _exchange_code(code: str) -> dict:

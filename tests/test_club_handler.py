@@ -9,6 +9,25 @@ def _texts(kb):
     return [b.text for row in kb.keyboard for b in row]
 
 
+def _cbs(kb):
+    return [b.callback_data for row in kb.inline_keyboard for b in row]
+
+
+def test_confirm_kb_add_move_when_nothing_recognized():
+    kb = club._confirm_kb({"canon": [], "unknown": []}, "ru")
+    assert "cmv" in _cbs(kb)
+
+
+def test_confirm_kb_add_move_when_unknown_present():
+    kb = club._confirm_kb({"canon": ["back_squat"], "unknown": ["бчб"]}, "ru")
+    assert "cmv" in _cbs(kb)
+
+
+def test_confirm_kb_no_add_move_when_all_recognized():
+    kb = club._confirm_kb({"canon": ["back_squat"], "unknown": []}, "ru")
+    assert "cmv" not in _cbs(kb)
+
+
 def _con():
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
@@ -39,9 +58,9 @@ def test_parse_alias_lines():
 
 def test_fmt_program_and_empty():
     assert club._fmt_program(None) == ""
-    row = {"day": "2026-06-10", "raw_text": "Фран 21-15-9"}
+    row = {"day": "2026-06-10", "raw_text": "Фран 21-15-9", "gym": "Universe"}
     s = club._fmt_program(row)
-    assert "2026-06-10" in s and "Фран" in s
+    assert "2026-06-10" in s and "Фран" in s and "Universe" in s
 
 
 def test_fmt_stats():
@@ -63,7 +82,7 @@ def test_register_builds_handlers():
             captured.append(h)
 
     club.register(App())
-    assert len(captured) == 4
+    assert len(captured) == 5
 
 
 def test_restandardize_resolves_after_alias():

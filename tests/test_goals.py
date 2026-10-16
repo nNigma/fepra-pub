@@ -43,3 +43,23 @@ def test_goal_progress_level():
     tier_hi = {"idx": 3, "level": "Продвинутый", "next_threshold": None, "value": 200, "distance": None}
     p2 = goal_progress(g, current_value=200, current_tier=tier_hi)
     assert p2["done"] is True
+
+
+def test_archive_goal_only_by_owner():
+    con = _con()
+    gid = botdb.add_goal(con, tg_id=1, kind="numeric", discipline="deadlift",
+                         target_value="140", metric="kg", title="Становая 140")
+    botdb.archive_goal(con, gid, tg_id=2)  # чужой пользователь
+    assert len(botdb.active_goals(con, 1)) == 1
+    botdb.archive_goal(con, gid, tg_id=1)
+    assert botdb.active_goals(con, 1) == []
+
+
+def test_complete_goal_only_by_owner():
+    con = _con()
+    gid = botdb.add_goal(con, tg_id=1, kind="numeric", discipline="deadlift",
+                         target_value="140", metric="kg", title="Становая 140")
+    botdb.complete_goal(con, gid, tg_id=2)
+    assert len(botdb.active_goals(con, 1)) == 1
+    botdb.complete_goal(con, gid, tg_id=1)
+    assert botdb.active_goals(con, 1) == []

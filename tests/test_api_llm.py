@@ -34,6 +34,8 @@ def test_get_llm_available_flag(tmp_path, monkeypatch):
 
 def _stub_llm(monkeypatch):
     monkeypatch.setattr(api, "_llm_payload", lambda con, kind, ref, tg_id: {"k": ref})
+    monkeypatch.setattr(api.llm_gen, "build_payload",
+                        lambda con, db, kind, ref, tg_id: {"k": ref})
     monkeypatch.setattr(api.llm_coach, "coach",
                         lambda kind, p, lang="ru", astro=False: ("разбор", "claude"))
     monkeypatch.setattr(api, "_sweep_unreviewed", lambda *a, **k: None)
@@ -73,6 +75,8 @@ def test_refresh_clears_stale_cache(tmp_path, monkeypatch):
     c = _setup(tmp_path, monkeypatch, pro=True)
     monkeypatch.setattr(api, "has_llm", lambda: True)
     monkeypatch.setattr(api, "_llm_payload", lambda con, kind, ref, tg_id: {"k": ref})
+    monkeypatch.setattr(api.llm_gen, "build_payload",
+                        lambda con, db, kind, ref, tg_id: {"k": ref})
     monkeypatch.setattr(api, "_sweep_unreviewed", lambda *a, **k: None)
     monkeypatch.setattr(api.llm_coach, "coach",
                         lambda kind, p, lang="ru", astro=False: ("старый разбор", "claude"))
@@ -146,16 +150,21 @@ def test_sweep_reviews_unreviewed_last7_skips_reviewed(tmp_path, monkeypatch):
     import tjbot.db as botdb
     dbp = str(tmp_path / "t.db")
     monkeypatch.setattr(api, "_llm_payload", lambda con, kind, ref, tg_id: {"k": kind, "r": ref})
+    monkeypatch.setattr(api.llm_gen, "build_payload",
+                        lambda con, db, kind, ref, tg_id: {"k": kind, "r": ref})
     monkeypatch.setattr(api.llm_coach, "coach", lambda kind, p, lang="ru", astro=False: ("разбор-"+kind, "gemini"))
     monkeypatch.setattr(api, "_finalize_llm", lambda con, tg, k, r, text, eng, lang: text)
+    monkeypatch.setattr(api.llm_gen, "finalize", lambda con, tg, k, r, text, eng, lang: text)
     monkeypatch.setattr(api, "llm_quota_consume", lambda tg, con: (_ for _ in ()).throw(AssertionError("свип не тратит квоту")))
     today = date.today()
     d_in = today.isoformat()
+    d_yday = (today - timedelta(days=1)).isoformat()
     d_old = (today - timedelta(days=30)).isoformat()
     con = botdb.connect(dbp)
     con.execute('INSERT INTO activities ("note","day","sport","activity_id","source","tg_id") VALUES (?,?,?,?,?,?)', (None, d_in, "crossfit", "a-in", "manual", 1))
     con.execute('INSERT INTO activities ("note","day","sport","activity_id","source","tg_id") VALUES (?,?,?,?,?,?)', (None, d_old, "crossfit", "a-old", "manual", 1))
-    con.execute('INSERT INTO meals ("tg_id","day","ts","foods","kcal","protein_g","fat_g","carb_g","quality") VALUES (?,?,?,?,?,?,?,?,?)', (1, d_in, "t", "[]", 500, 30, 10, 40, 3))
+    for d in (d_yday, d_in):          # вчера разбираем, сегодня — нет
+        con.execute('INSERT INTO meals ("tg_id","day","ts","foods","kcal","protein_g","fat_g","carb_g","quality") VALUES (?,?,?,?,?,?,?,?,?)', (1, d, "t", "[]", 500, 30, 10, 40, 3))
     botdb.llm_cache_put(con, 1, "workout", d_in, "hx", "СТАРЫЙ workout-разбор", "claude")
     con.commit(); con.close()
     monkeypatch.setattr(api, "_db", lambda: dbp)
@@ -164,8 +173,9 @@ def test_sweep_reviews_unreviewed_last7_skips_reviewed(tmp_path, monkeypatch):
     def has(k, r): return botdb.llm_cache_get_latest(con, 1, k, r, "ru") is not None
     def txt(k, r): return botdb.llm_cache_get_latest(con, 1, k, r, "ru")["text"]
     assert has("competitions", "total")
-    assert has("nutr_day", d_in)
-    assert has("nutr_week", d_in)
+    assert has("nutr_day", d_yday)
+    assert has("nutr_week", d_yday)
+    assert not has("nutr_day", d_in)        # текущий день не прожит — не разбираем
     assert txt("workout", d_in) == "СТАРЫЙ workout-разбор"
     assert not has("workout", d_old)
     assert not has("summary", "30d")

@@ -152,3 +152,10 @@ def reset_claude_cache() -> None:
     """Сброс кэша (для тестов)."""
     global _CLAUDE_ENABLED_CACHE
     _CLAUDE_ENABLED_CACHE = None
+
+
+def bot_username(env: dict[str, str] | None = None) -> str:
+    val = os.environ.get("BOT_USERNAME")
+    if not val and env:
+        val = env.get("BOT_USERNAME")
+    return val or "example_bot"

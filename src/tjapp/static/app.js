@@ -22,7 +22,8 @@ async function llmCall(kind, ref, refresh){
 }
 function llmSig(engine){
   if(!engine) return '';
-  const s=engine==='claude'?T('llm.by_claude'):T('llm.by_gemini');
+  // agent-хелпер ходит в те же модели Claude — для читателя это тот же Клод
+  const s=(engine==='claude'||engine==='agent')?T('llm.by_claude'):T('llm.by_gemini');
   return `<div class="mut" style="font-size:11.5px;margin:1px 0 7px">${s}</div>`;
 }
 function llmShow(box, kind, ref, text, engine){
@@ -126,7 +127,7 @@ const METRIC_IDS=['readiness','hrv','rhr','sleep','bb','sleep_score','spo2','res
 function metricInfo(id){ return {name:T('metric.'+id+'.name'), desc:T('metric.'+id+'.desc')}; }
 
 function metricChartSvg(series, base, dir, sparse){
-  if(!series||series.length<2) return `<div class="mut" style="font-size:12px;padding:6px 0">${T('chart.no_data')}</div>`;
+  if(!series||series.length<(sparse?1:2)) return `<div class="mut" style="font-size:12px;padding:6px 0">${T('chart.no_data')}</div>`;
   const w=320,h=112,x1=w-6,y1=h-16,n=series.length;
   const x0=sparse?14:24, y0=sparse?20:8;
   const vals=series.map(p=>p[1]);
@@ -218,6 +219,69 @@ function metricsHelpHtml(){
   return `<details class="methelp"><summary>${T('methelp.title')}</summary>${METRIC_IDS.map(id=>{const info=metricInfo(id);return `<div class="methelp-it"><b>${info.name}</b> - ${info.desc}</div>`}).join('')}</details>`;
 }
 
+const NUTRW_LABELS=()=>({kcal:T('nut.kcal'),protein_g:T('nut.protein'),fat_g:T('nut.fat'),carb_g:T('nut.carb'),fiber_g:T('nut.m_fiber'),sugar_g:T('nut.m_sugar'),sodium_mg:T('nut.m_sodium'),iron_mg:T('nut.m_iron'),calcium_mg:T('nut.m_calcium'),magnesium_mg:T('nut.m_magnesium'),potassium_mg:T('nut.m_potassium')});
+
+function toggleNutrMetric(id){
+  const host=document.getElementById('nutrWeekDetail');
+  const nw=window.NUTR_WEEK;
+  if(!host||!nw)return;
+  if(host.dataset.open===id){host.innerHTML='';host.dataset.open='';return;}
+  host.dataset.open=id;
+  const m=(nw.metrics||{})[id]||{};
+  const chart=metricChartSvg(m.series||[],m.base,m.dir,true);
+  const bench=m.base!=null?` · ${T('nutw.bench').replace('{v}',m.base)}`:'';
+  host.innerHTML=`<div class="mdetail"><div class="mdetail-hd">${NUTRW_LABELS()[id]||id}${bench}</div>${chart}<div class="mdetail-hint">${T('mdetail.hint')}</div></div>`;
+  host.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function nutrWeekSection(nw){
+  if(!nw)return '';
+  const clsC={green:'var(--green)',amber:'var(--amber)',red:'var(--red)'};
+  const k=nw.kcal||{};
+  const dTxt=k.delta==null?'':(k.cls==='green'?T('nutw.on_target'):(k.delta<0?T('nutw.under').replace('{v}',-k.delta):T('nutw.over').replace('{v}',k.delta)));
+  const kcalCard=`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="toggleNutrMetric('kcal')">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div><span style="font-size:26px;font-weight:700">${k.sum!=null?k.sum:'—'}</span><span style="font-size:12px;opacity:.6;margin-left:4px">${k.target_week?'/ '+k.target_week+' ':''}${T('nut.kcal')} ›</span></div>
+      <div style="font-size:13px;font-weight:600;color:${clsC[k.cls]||'var(--mut)'}">${dTxt}</div>
+    </div>
+    <div style="font-size:12px;color:var(--mut);margin-top:3px">${T('nutw.avg_day').replace('{v}',k.avg+' '+T('nut.kcal'))}</div>
+  </div>`;
+  const mbarW=(id,label,color)=>{
+    const m=(nw.metrics||{})[id];
+    if(!m)return '';
+    const pct=m.target_week?Math.min(100,Math.round(m.sum/m.target_week*100)):0;
+    return `<div style="flex:1;background:rgba(128,128,128,.08);border-radius:10px;padding:8px;cursor:pointer" onclick="toggleNutrMetric('${id}')">
+      <div style="font-size:11px;color:var(--mut)">${label} ›</div>
+      <div style="font-weight:700">${Math.round(m.sum)}${m.target_week?'/'+m.target_week:''} ${T('nut.g')}</div>
+      ${m.target_week?`<div style="height:4px;background:rgba(128,128,128,.25);border-radius:2px;margin-top:4px"><div style="width:${pct}%;height:4px;background:${color};border-radius:2px"></div></div>`:''}
+      <div style="font-size:11px;color:var(--mut);margin-top:4px">${T('nutw.avg_day').replace('{v}',Math.round(m.avg)+' '+T('nut.g'))}</div>
+    </div>`;
+  };
+  const microTiles=[['fiber_g',T('nut.g')],['sugar_g',T('nut.g')],['sodium_mg',T('nut.mg')],['iron_mg',T('nut.mg')],['calcium_mg',T('nut.mg')],['magnesium_mg',T('nut.mg')],['potassium_mg',T('nut.mg')]]
+    .map(([id,unit])=>{
+      const m=(nw.metrics||{})[id];
+      if(!m)return '';
+      const lim=m.dir==='high_bad'?'≤':'';
+      return `<div class="det-tile" style="cursor:pointer" onclick="toggleNutrMetric('${id}')">
+        <div class="det-tile-v"${m.flag?' style="color:var(--red)"':''}>${Math.round(m.sum)}/${lim}${m.target_week}</div>
+        <div class="det-tile-l">${NUTRW_LABELS()[id]}, ${unit} · ${T('nutw.avg_day').replace('{v}',Math.round(m.avg))} ›</div></div>`;
+    }).join('');
+  const listCard=(title,items)=>items&&items.length?`
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin:14px 0 8px">${title}</div>
+    <div class="card">${items.map(x=>`<div style="font-size:13px;margin:3px 0">• ${x}</div>`).join('')}</div>`:'';
+  const ppk=nw.protein_per_kg_avg;
+  const d1=nw.range[0].slice(8)+'.'+nw.range[0].slice(5,7),d2=nw.range[1].slice(8)+'.'+nw.range[1].slice(5,7);
+  return `<h2>${T('nutw.title')}</h2>
+  <div class="sub">${T('nutw.sub').replace('{a}',d1).replace('{b}',d2).replace('{n}',nw.days_recorded)}</div>
+  ${kcalCard}
+  <div style="display:flex;gap:8px;margin-bottom:8px">${mbarW('protein_g',T('nut.protein'),'#e5484d')}${mbarW('fat_g',T('nut.fat'),'#b088f9')}${mbarW('carb_g',T('nut.carb'),'#4c8dff')}</div>
+  ${ppk!=null?`<div style="font-size:12px;color:${nw.protein_ok?'var(--green)':'var(--amber)'};margin:-2px 0 8px">${T('nutw.protein_per_kg').replace('{v}',ppk)}</div>`:''}
+  <div id="nutrWeekDetail" data-open=""></div>
+  <div class="det-tiles" style="grid-template-columns:repeat(2,1fr)">${microTiles}</div>
+  ${listCard(T('nutw.conclusions_hd'),nw.conclusions)}
+  ${listCard(T('nut.advice_hd'),nw.advice)}`;
+}
+
 const V = {green:['var(--greenb)','var(--green)'],amber:['var(--amberb)','var(--amber)'],red:['var(--redb)','var(--red)']};
 
 function adviceCard(adv){
@@ -280,6 +344,7 @@ function renderSummary(DATA){
   window.SUMMARY_METRICS=DATA.metrics||{};
   window.HRV_STATUS_CUR=DATA.hrv_status||null;
   window.SLEEP_STRUCT=(DATA.sleep_deep_h!=null||DATA.sleep_rem_h!=null)?{deep:DATA.sleep_deep_h,rem:DATA.sleep_rem_h}:null;
+  window.NUTR_WEEK=DATA.nutrition_week||null;
   const m=DATA.m, vd=DATA.verdict, S=DATA.series;
   const st=DATA.state||{};
   const mc=DATA.microcycle||{};
@@ -449,6 +514,7 @@ function renderSummary(DATA){
   <div style="position:relative;height:240px"><canvas id="ch"></canvas></div>
   <h2>${T('summary.sports_title')}</h2>
   <div class="card">${DATA.sports.map(s=>`<span class="sp">${s[0]} · ${s[1]}</span>`).join('')}</div>
+  ${nutrWeekSection(DATA.nutrition_week)}
   ${n30Html}
   <div id="llmhost_summary"></div>
   ${metricsHelpHtml()}`;
@@ -911,6 +977,12 @@ function goalCard(g){
   return `<div class="goal"><div class="gtop"><span>${g.title}</span><span class="mut">${right}</span></div>
     <div class="bar"><i style="width:${Math.min(pct,100)}%"></i></div></div>`;
 }
+function enterPm(bot){
+  const url='https://t.me/'+(bot||'example_bot')+'?start=pm';
+  if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openTelegramLink) Telegram.WebApp.openTelegramLink(url);
+  else location.href=url;
+}
+
 function renderGoals(d){
   const ov=d.overall||{};
   const head=ov.level
@@ -928,6 +1000,7 @@ function renderGoals(d){
     ${head}
     <div class="sec">${T('goals.my_goals')}</div>${goals}
     <div class="add" onclick="Telegram.WebApp.close&&Telegram.WebApp.close()">${T('goals.add_cta')}</div>
+    <div class="add" onclick="enterPm('${d.bot_username||'example_bot'}')">${T('goals.enter_pm')}</div>
     <div class="sec">${T('goals.lifts')}</div>${lifts}
     <div class="sec">${T('goals.benchmarks')}</div>${bms}
     <div class="foot">${T('goals.source_note')}</div>`;

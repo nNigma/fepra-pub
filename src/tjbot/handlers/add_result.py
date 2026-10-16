@@ -24,7 +24,8 @@ from .. import db as botdb
 from ..access import restricted
 from . import menu
 from .menu import show_menu
-from .record_workout import (_parse_date, _tz, save_filled_result,
+from .record_workout import (_parse_date, _tz, results_help, results_help_kb,
+                             save_filled_result,
                              bodyweight as rw_bodyweight, skip_bodyweight as rw_skip_bodyweight)
 
 AR_DATE, AR_CONFIRM, AR_RESULT, AR_INGYM, AR_BW = range(5)
@@ -47,11 +48,12 @@ async def entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return AR_DATE
 
 
-async def _after_date(context: ContextTypes.DEFAULT_TYPE, message, d, lang: str) -> int:
+async def _after_date(context: ContextTypes.DEFAULT_TYPE, message, d, lang: str, uid: int) -> int:
+    from .club import target_gym
     context.user_data["ar_day"] = d.isoformat()
     con = botdb.connect(context.bot_data["db_path"])
     try:
-        prog = botdb.get_program(con, d.isoformat(), "Universe")
+        prog = botdb.get_program(con, d.isoformat(), target_gym(con, uid))
     finally:
         con.close()
     if not prog:
@@ -87,7 +89,7 @@ async def pick_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     today = datetime.now(_tz(context)).date()
     d = today if choice == "today" else today - timedelta(days=1)
     await q.edit_message_text(i18n.t("addresult.date_chosen", lang, date=d))
-    return await _after_date(context, q.message, d, lang)
+    return await _after_date(context, q.message, d, lang, q.from_user.id)
 
 
 async def got_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -98,7 +100,7 @@ async def got_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not d:
         await update.message.reply_text(i18n.t("addresult.date_invalid", lang))
         return AR_DATE
-    return await _after_date(context, update.message, d, lang)
+    return await _after_date(context, update.message, d, lang, update.effective_user.id)
 
 
 async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -126,8 +128,8 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["ar_blocks"] = blocks
     context.user_data["ar_blocks_verified"] = bool(stored)
     await q.edit_message_text(i18n.t("addresult.accepted", lang))
-    await q.message.reply_text(
-        i18n.t("addresult.fill_results_template", lang, tmpl=(tmpl or "—")[:1500]))
+    await q.message.reply_text(i18n.t("addresult.fill_results_template", lang))
+    await q.message.reply_text((tmpl or "—")[:3500], reply_markup=results_help_kb(lang))
     return AR_RESULT
 
 
@@ -176,7 +178,8 @@ def handler() -> ConversationHandler:
                       MessageHandler(menu.not_menu_text(), got_date)],
             AR_CONFIRM: [CallbackQueryHandler(confirm, pattern=r"^arc:")],
             AR_INGYM: [CallbackQueryHandler(in_gym, pattern=r"^arg:")],
-            AR_RESULT: [MessageHandler(menu.not_menu_text(), got_result)],
+            AR_RESULT: [MessageHandler(menu.not_menu_text(), got_result),
+                        CallbackQueryHandler(results_help, pattern=r"^reshelp$")],
             AR_BW: [
                 MessageHandler(menu.not_menu_text(), rw_bodyweight),
                 CommandHandler("skip", rw_skip_bodyweight),

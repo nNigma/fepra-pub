@@ -5,10 +5,14 @@ Auto: если есть GEMINI_API_KEY -> распознаём фото, дви�
 """
 from __future__ import annotations
 
+import os
+
 import json
+import math
 import re
 
 from tj import llm
+from tj.analysis.wod_notation import parse_scheme
 from tj.ontology import resolve, MOVEMENTS
 
 _PROMPT = (
@@ -30,10 +34,20 @@ def has_claude() -> bool:
 
 
 def engine_for(tg_id: int) -> str:
-    """Claude включён -> все фото в Claude CLI (Gemini — фолбэк роутера).
-    Выключен -> Gemini единственный движок."""
+    """Движок по подписке для фото и тяжёлого текста; Gemini — фолбэк роутера.
+    FEPRA_LLM_ENGINE=agent (opt-in, нужен FEPRA_AGENT_HELPER) — внешний
+    инференс-хелпер; иначе Claude, если включён (FEPRA_USE_CLAUDE / [llm]
+    use_claude); иначе Gemini — единственный движок."""
     from tj.config import claude_enabled
+    want = (os.environ.get("FEPRA_LLM_ENGINE") or "claude").strip().lower()
+    if want == "agent" and llm.has_agent():
+        return "agent"
     return "claude" if claude_enabled() else "gemini"
+
+
+def subscription_ready(engine: str) -> bool:
+    """Готов ли выбранный движок по подписке (агент установлен / claude есть)."""
+    return llm.has_agent() if engine == "agent" else llm.has_claude_vision()
 
 
 def _as_text(v) -> str:
@@ -197,10 +211,14 @@ def _valid_meal(data: dict) -> dict | None:
 
 
 def parse_meal(image_bytes: bytes, media_type: str = "image/jpeg",
-               engine: str = "gemini", correction: str | None = None) -> dict | None:
+               engine: str = "gemini", correction: str | None = None,
+               hint: str | None = None) -> dict | None:
     """Фото еды -> {foods, totals, question, confidence} | None.
     correction — текст-уточнение пользователя для повторного парса."""
     prompt = _MEAL_PROMPT
+    if hint and hint.strip():
+        prompt += ("\n\nОписание от пользователя к фото (что за блюда, состав, порция; "
+                   f"считай это фактом, фото — для проверки): {hint.strip()[:600]}")
     if correction:
         prompt += f"\n\nУточнение пользователя (учти как факт): {correction.strip()[:400]}"
     # еда — на opus: счёт штук и классификация блюд заметно точнее, чем у sonnet
@@ -220,10 +238,10 @@ def parse_meal_text(desc: str, engine: str = "gemini",
     if correction:
         prompt += f"\n\nУточнение пользователя (учти как факт): {correction.strip()[:400]}"
     raw = None
-    if engine == "claude":
-        raw = llm.claude_complete(prompt, model="opus")
+    if engine in ("claude", "agent"):
+        raw = llm.subscription_complete(prompt, engine=engine, model="opus")
         if not raw:
-            print("[llm] claude_complete не ответил, фолбэк на gemini", flush=True)
+            print(f"[llm] {engine}: текст не разобран, фолбэк на gemini", flush=True)
     if not raw:
         raw = llm.complete("Ты считаешь КБЖУ по описанию еды.", prompt,
                            max_output_tokens=2000)
@@ -247,7 +265,8 @@ _VERIFY_PROMPT = (
     "именах движений.\n"
     "Поля блока: header (строка), format (один из: for_time, amrap, amrap_interval, "
     "emom_strength, ladder, tabata, death_by, other), rounds, reps, work_min, "
-    "rest_min (числа или null), scheme (строка или null), has_cap (true/false), "
+    "rest_min (числа или null), scheme (массив чисел или null — повторы по раундам "
+    "лесенки, например [21,15,9]), has_cap (true/false), "
     "movements (массив СТРОК — имена движений по-русски как на доске, с весами и "
     "дистанциями). Разминку не включай. Не выдумывай ничего, чего нет на доске; "
     "если разбор верен — верни его без изменений. Верни ТОЛЬКО JSON-массив.\n\n"
@@ -297,7 +316,6 @@ def verify_result_blocks(board_text: str, blocks: list,
         names = [m.strip() for m in movs if isinstance(m, str) and m.strip()]
         if not names:
             return blocks, False
-        scheme = b.get("scheme")
         out.append({"header": str(b.get("header") or "Блок")[:40],
                     "format": fmt,
                     "rounds": _num_or_none(b.get("rounds")),
@@ -307,7 +325,7 @@ def verify_result_blocks(board_text: str, blocks: list,
                     "has_cap": bool(b.get("has_cap")),
                     "movements": [_movement(n, aliases) for n in names],
                     "benchmark": None,
-                    "scheme": scheme if isinstance(scheme, str) and scheme else None})
+                    "scheme": parse_scheme(b.get("scheme"))})
     return out, True
 
 
@@ -398,33 +416,88 @@ _RESULTS_PROMPT = (
 )
 
 
+def _with_hint(prompt: str, hint: str | None) -> str:
+    if hint and hint.strip():
+        return prompt + f"\n\nПояснение пользователя к фото (считай фактом): {hint.strip()[:600]}"
+    return prompt
+
+
 def parse_stages(image_bytes: bytes, media_type: str = "image/jpeg",
-                 engine: str = "gemini") -> list | None:
-    raw = llm.vision(image_bytes, _STAGES_PROMPT, media_type=media_type, engine=engine)
+                 engine: str = "gemini", hint: str | None = None) -> list | None:
+    raw = llm.vision(image_bytes, _with_hint(_STAGES_PROMPT, hint), media_type=media_type,
+                     engine=engine)
     if not raw:
         return None
     data = _extract_json_array(raw)
     if not data:
         return None
     out = []
-    for st in data:
+    for st in data[:30]:
         if not isinstance(st, dict):
             continue
-        st["name"] = _as_text(st.get("name"))
-        st["prescription"] = _as_text(st.get("prescription"))
-        movs = st.get("movements") or []
-        st["movements_canon"] = [c for c in (resolve(m) for m in movs) if c]
-        out.append(st)
+        movs_in = st.get("movements")
+        movs = ([m.strip() for m in movs_in if isinstance(m, str) and m.strip()]
+                if isinstance(movs_in, list) else [])
+        fmt = st.get("format")
+        out.append({"name": _as_text(st.get("name")),
+                    "prescription": _as_text(st.get("prescription")),
+                    "format": fmt if isinstance(fmt, str) and fmt else None,
+                    "movements": movs,
+                    "movements_canon": [c for c in (resolve(m) for m in movs) if c]})
     return out or None
 
 
+def _result_place(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        return int(v) if math.isfinite(v) else None
+    if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+        return int(v.strip())
+    return None
+
+
+def _valid_results(data: dict) -> dict | None:
+    """Жёсткая валидация ответа таблицы результатов: rows — только список словарей
+    с примитивными stage/value/place, чтобы потребитель не итерировал строку
+    посимвольно и не падал на .get у скаляра. Не тот тип наверху -> None."""
+    if not isinstance(data, dict):
+        return None
+    rows_in = data.get("rows")
+    if not isinstance(rows_in, list):
+        return None
+    rows = []
+    for r in rows_in[:60]:
+        if not isinstance(r, dict):
+            continue
+        stage = r.get("stage")
+        if isinstance(stage, bool):
+            stage = None
+        elif isinstance(stage, float):
+            stage = int(stage) if math.isfinite(stage) and stage == int(stage) else None
+        elif isinstance(stage, str):
+            stage = stage.strip()[:80] or None
+        elif not isinstance(stage, int):
+            stage = None
+        value = r.get("value")
+        value = (str(value).strip()[:120]
+                 if value is not None and str(value).strip() else None)
+        rows.append({"stage": stage, "value": value, "place": _result_place(r.get("place"))})
+    athlete = data.get("athlete")
+    return {"athlete": athlete.strip()[:80] if isinstance(athlete, str) else "",
+            "rows": rows}
+
+
 def parse_results(image_bytes: bytes, athlete_hint: str, media_type: str = "image/jpeg",
-                  engine: str = "gemini") -> dict | None:
-    raw = llm.vision(image_bytes, _RESULTS_PROMPT.format(athlete=athlete_hint),
+                  engine: str = "gemini", hint: str | None = None) -> dict | None:
+    raw = llm.vision(image_bytes, _with_hint(_RESULTS_PROMPT.format(athlete=athlete_hint), hint),
                      media_type=media_type, engine=engine)
     if not raw:
         return None
-    return _extract_json(raw)
+    data = _extract_json(raw)
+    return _valid_results(data) if data else None
 
 
 _TEXT_PROMPT = (
@@ -488,16 +561,27 @@ def parse_board(image_bytes: bytes, media_type: str = "image/jpeg",
     Gemini, Claude запасным; engine="claude" (медленно, точнее) — сначала Claude,
     Gemini запасным. В ответе engine_used — фактически сработавший (для уведомления
     о фолбэке, если выбранный движок не ответил)."""
-    order = ["claude", "gemini"] if engine == "claude" else ["gemini", "claude"]
+    if engine in ("claude", "agent"):
+        order = [engine, "gemini"]
+    else:
+        order = ["gemini", "claude"]
     raw = None
     used = None
     for eng in order:
-        if eng == "claude":
-            if not llm.has_claude_vision():
-                continue
-            raw = llm.claude_vision(image_bytes, _PROMPT, media_type=media_type)
-        else:
-            raw = llm.vision(image_bytes, _PROMPT, media_type=media_type, engine="gemini")
+        try:
+            if eng == "agent":
+                if not llm.has_agent():
+                    continue
+                raw = llm.agent_run(_PROMPT, image_bytes=image_bytes, media_type=media_type)
+            elif eng == "claude":
+                if not llm.has_claude_vision():
+                    continue
+                raw = llm.claude_vision(image_bytes, _PROMPT, media_type=media_type)
+            else:
+                raw = llm.vision(image_bytes, _PROMPT, media_type=media_type, engine="gemini")
+        except Exception as e:
+            print(f"[llm] parse_board {eng} упал ({type(e).__name__}: {e})", flush=True)
+            raw = None
         if raw:
             used = eng
             break

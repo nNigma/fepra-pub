@@ -82,8 +82,8 @@ def test_profile_card_has_history_button(tmp_path):
     con.close()
     msg = _FakeMsg()
     asyncio.run(menu._profile.__wrapped__(_FakeUpdate(5, msg), _FakeCtx(p)))
-    assert _callbacks(msg.markup) == {"gsync", "ghist", "gdisc", "bw:start", "astro:toggle",
-                                       "ngoal:open", "ncity:open"}
+    assert _callbacks(msg.markup) == {"gsync", "ghist", "gdisc", "pedit:open", "bw:start",
+                                       "astro:toggle", "ngoal:open", "ncity:open"}
 
 
 def test_profile_no_history_button_without_garmin(tmp_path):
@@ -95,7 +95,7 @@ def test_profile_no_history_button_without_garmin(tmp_path):
     con.close()
     msg = _FakeMsg()
     asyncio.run(menu._profile.__wrapped__(_FakeUpdate(6, msg), _FakeCtx(p)))
-    assert _callbacks(msg.markup) == {"gconnect", "bw:start", "astro:toggle",
+    assert _callbacks(msg.markup) == {"gconnect", "pedit:open", "bw:start", "astro:toggle",
                                        "ngoal:open", "ncity:open", "wconnect:samsung",
                                        "wconnect:whoop", "wconnect:apple"}
 

@@ -165,6 +165,12 @@ def summarize_filled(blocks, text: str) -> tuple[dict, list[str]]:
         body = take(header)
         if body is None:
             continue
+        if fmt == "ladder":
+            # у лесенки поля лежат в секциях упражнений (время — в последней): склеиваем их
+            for m in b.get("movements") or []:
+                mb = take(m.get("name") or "")
+                if mb:
+                    body = body + mb
 
         if fmt in _TIME_FORMATS:
             v = _val(body, "время", prefix=True)
@@ -200,6 +206,36 @@ def summarize_filled(blocks, text: str) -> tuple[dict, list[str]]:
                 all_rounds.append((r, reps))
                 line = f"{header} — {r} кругов" + (f" +{reps}" if reps else "")
                 lines.append(line)
+        elif fmt == "stations":
+            # интервальный круг «N сек работа / M отдых»: круги + результат по каждой станции
+            parts, st = [], []
+            for m in b.get("movements") or []:
+                mbody = take(m.get("name") or "")
+                if not mbody:
+                    continue
+                for label, val in mbody:
+                    if not _is_filled(val):
+                        continue
+                    # значения новых типов уже несут единицы в тексте («22 ккал», «100 кг, 20 м»)
+                    own_unit = label.startswith(("кардио", "вес и дистанция"))
+                    unit = ("" if own_unit or "вес×повторы" in label
+                            else "сек" if label.startswith("удержание")
+                            else "м" if label.startswith("метров")
+                            else "ккал" if "ккал" in label
+                            else "" if label.startswith("повторы, вес") and "x" in val
+                            else "повт")
+                    parts.append(f"{m['name']} {val}{(' ' + unit) if unit else ''}")
+                    st.append({"movement": m["name"], "value": val, "unit": unit or None})
+            rv = _val(body, "кругов", prefix=True)
+            if rv or parts:
+                line = f"{header}"
+                if rv:
+                    line += f" — {rv} кругов"
+                if parts:
+                    line += (" — " if not rv else "; ") + "; ".join(parts)
+                lines.append(line)
+                data.setdefault("stations", []).append(
+                    {"header": header, "rounds": rv, "results": st})
         elif fmt == "death_by":
             mv = _val(body, "дошёл до минуты")
             if mv:
@@ -215,6 +251,13 @@ def summarize_filled(blocks, text: str) -> tuple[dict, list[str]]:
             mv = _val(body, "выполнено минут")
             if mv:
                 lines.append(f"{header} — минут: {mv}")
+            # гимнастический скилл: «выполнено выходов/повторов: N» или «кругов (по M …): N»
+            rv = _val(body, "кругов", prefix=True)
+            gv = _val(body, "выполнено выходов") or _val(body, "выполнено повторов")
+            if rv:
+                lines.append(f"{header} — {rv} кругов")
+            elif gv:
+                lines.append(f"{header} — выполнено: {gv}")
 
     if all_rounds:
         tr = sum(r for r, _ in all_rounds)

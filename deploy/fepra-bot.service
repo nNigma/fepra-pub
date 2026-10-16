@@ -11,6 +11,8 @@ Type=simple
 # Where you cloned the repo:
 WorkingDirectory=/opt/fepra
 Environment=PYTHONPATH=src
+# FEPRA_PUBLIC_URL, VAPID keys etc. are read from the process environment:
+EnvironmentFile=-/opt/fepra/.env
 # Public HTTPS URL of the Mini App (same as MINIAPP_URL in .env):
 Environment=MINIAPP_URL=https://your-domain.example.org
 ExecStart=/opt/fepra/.venv/bin/python -m tjbot.main
